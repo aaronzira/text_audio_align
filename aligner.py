@@ -40,44 +40,38 @@ def data_generator(file_id):
     # every word as returned from gentle
     for catch in aligned["words"]:
 
-        # first word in the file or after a missed word
-        if not current:
-            if catch["case"] == "success":
+        # consecutive capture
+        if catch["case"] == "success" and current:
+            running_time = catch["end"]-start_time
+
+            # start new string if adding this word would exceed 20s
+            if running_time > 19.99:
+                times.append(end_time)
+                strings.append(current)
+
                 start_time = catch["start"]
                 times.append(start_time)
                 current = catch["alignedWord"]
+
+            # if total time is under 20s append captured word to current string
+            else:
+                current = " ".join([current,catch["alignedWord"]])
                 end_time = catch["end"]
 
-        # the previous word was a success
-        else:
-            # append to current string if the total time is under 20s,
-            # otherwise start new string
-            if catch["case"] == "success":
-                running_time = catch["end"]-start_time
+        # miss after consecutive captures
+        elif catch["case"] != "success" and current:
+            strings.append(current)
+            times.append(end_time)
+            current = ""
 
-                if running_time > 19.99:
-                    # the string ends with the previous word
-                    times.append(end_time)
-                    strings.append(current)
+        # capture on first word in the file or after a missed word
+        elif catch["case"] == "success":
+            start_time = catch["start"]
+            times.append(start_time)
+            current = catch["alignedWord"]
+            end_time = catch["end"]
 
-                    # start the new string with this word
-                    start_time = catch["start"]
-                    times.append(start_time)
-                    current = catch["alignedWord"]
-
-                else:
-                    current = " ".join([current,catch["alignedWord"]])
-                    end_time = catch["end"]
-
-            # missed word
-            else:
-                if current:
-                    strings.append(current)
-                    times.append(end_time)
-                    current = ""
-                pass
-
-    # the last word was a success but the string hasn't been written yet
+    # last word was a success but current string hasn't been written yet
     if current:
         times.append(end_time)
         strings.append(current)

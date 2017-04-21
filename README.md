@@ -2,4 +2,10 @@
 Generate text and audio splits from strings successfully aligned by Gentle 
 
 ## current testing setup
-- expects to read a directory of .txt or .mp3 files called "files/", and will write out to "text_testing/" and "audio_testing/"
+
+with script.py and aligner.py moved to /PATH/TO/gentle/,
+```
+$cd gentle
+$mkdir -p ../audio_second/audio_testing ../audio_second/text_testing`
+$python script.py FILE_ID
+```

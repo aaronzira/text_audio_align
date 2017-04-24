@@ -3,20 +3,22 @@ import multiprocessing
 import json
 import subprocess
 
+import boto3
 import gentle
 
 def data_generator(file_id):
 
     # input sources
-    audio_dir = "../audio_second" ### boto here to grab from s3 bucket
-    transcripts_dir = "../audio_second" ### "~/scribie/records"
+    txt_file = "~/records/{}.txt".format(file_id)
+    audio_file = "./{}.mp3".format(file_id))
 
-    audio_file = os.path.join(audio_dir,"{}.mp3".format(file_id))
-    txt_file = os.path.join(transcripts_dir,"{}.txt".format(file_id))
+    # grab audio file
+    bucket = boto3.resource("s3").Bucket("cgws")
+    bucket.download_file("{}.mp3".format(file_id),audio_file)
 
     # output
-    text_out_dir = "../audio_second/text_testing" ###"~/deepspeech_data/stm"
-    wav_out_dir = "../audio_second/audio_testing" ###"~/deepspeech_data/wav"
+    text_out_dir = "~/deepspeech_data/stm"
+    wav_out_dir = "~/deepspeech_data/wav"
 
     # reading json from alignment using gentle
     with open(txt_file,"r") as tr:
@@ -100,3 +102,5 @@ def data_generator(file_id):
         file_dur = float(subprocess.Popen(["soxi","-D","{}".format(audio_segment)],
                                           stdout=subprocess.PIPE).stdout.read().strip())
         assert file_dur == duration
+
+    os.remove(audio_file)

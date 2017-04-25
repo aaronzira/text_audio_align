@@ -5,6 +5,6 @@ Generate text and audio splits from strings successfully aligned by Gentle
 
 with script.py and aligner.py moved to /PATH/TO/gentle/,
 ```
-$cd gentle
-$python script.py FILE_ID
+$ cd gentle
+$ python script.py FILE_ID
 ```

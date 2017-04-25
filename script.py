@@ -6,4 +6,6 @@ from aligner import data_generator
 if len(sys.argv) != 2:
     print("Please enter a file id.")
 
-data_generator(sys.argv[1])
+data_generator(filename)
+
+

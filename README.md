@@ -1,10 +1,10 @@
-# text_audio_align
+# text_audio_aligner
 Generate text and audio splits from strings successfully aligned by Gentle 
 
-## current testing setup
+## setup for use with individual files
 
-with script.py and aligner.py moved to /PATH/TO/gentle/,
+with asr_data_gen.py and aligner.py moved to /PATH/TO/gentle/,
 ```
 $ cd gentle
-$ python script.py FILE_ID
+$ python asr_data_gen.py FILE_ID
 ```

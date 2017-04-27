@@ -64,7 +64,7 @@ def data_generator(file_id):
                 start_time = catch["start"]
                 times.append(start_time)
                 current = catch["alignedWord"]
-		end_time = catch["end"]
+                end_time = catch["end"]
 
             # append captured word to current string if total time is under 20s
             else:
@@ -117,6 +117,6 @@ def data_generator(file_id):
     total_dur = float(subprocess.Popen(["soxi","-D","{}".format(audio_file)],
                                        stdout=subprocess.PIPE).stdout.read().strip())
     print("Wrote {} files from {}, totalling {} seconds out of a possible {}.".format(
-	len(text_and_times),file_id,sum([duration for (_,_,duration) in start_end_duration]),total_dur))
+        len(text_and_times),file_id,sum([duration for (_,_,duration) in start_end_duration]),total_dur))
 
     os.remove(audio_file)

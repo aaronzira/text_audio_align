@@ -75,18 +75,14 @@ def data_generator(file_id,max_length=20.0):
     with open(txt_file,"r") as tr:
         transcript = tr.read()
 
-    # split transcript by speaker, and get timestamps (as seconds)
-    # of the boundaries of each paragraph
-    paragraphs = []
-    times = []
-    for paragraph in transcript.split("\n"):
-        catch = re.match("\d:\d+:\d+\.\d",paragraph)
-        if catch:
-            timestamp = catch.group()
-            h,m,s = timestamp.split(":")
-            time = int(h)*60*60 + int(m)*60 + float(s)
-            paragraphs.append(paragraph)
-            times.append(time)
+    # split transcript by speaker
+    paragraphs = [paragraph for paragraph in transcript.split("\n")
+                    if re.match("\d:\d+:\d+\.\d",paragraph)]
+
+    # get timestamps (as seconds) of the boundaries of each paragraph
+    timestamps = [re.match("\d:\d+:\d+\.\d",p).group() for p in paragraphs]
+    times = [int(h)*60*60 + int(m)*60 + float(s)
+                for h,m,s in [time.split(":") for time in timestamps]]
     file_end = get_duration(mp3)
     times.append(file_end)
 

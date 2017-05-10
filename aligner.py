@@ -1,4 +1,5 @@
 import os
+import sys
 import re
 import multiprocessing
 import json
@@ -8,7 +9,7 @@ import boto3
 import gentle
 import logging
 
-logging.basicConfig(filename="alignment.log",level=logging.INFO,format="%(asctime)s - %(levelname)s - %(message)s",datefmt="%Y-%m-%d %H:%M:%S")
+logging.basicConfig(level=logging.INFO,format="%(asctime)s - %(levelname)s - %(message)s",datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger("info_logger")
 
 def clean(text):
@@ -66,10 +67,15 @@ def data_generator(file_id,max_length=20.0):
     # grab audio file from s3
     logger.info("Downloading mp3 from S3...")
     mp3 = "/home/aaron/data/mp3s/{}.mp3".format(file_id)
-    ### try/except here if there's a chance a file won't be there
+    
     if not os.path.isfile(mp3):
-    	bucket = boto3.resource("s3").Bucket("cgws")
-    	bucket.download_file("{}.mp3".format(file_id),mp3)
+	try:
+    	    bucket = boto3.resource("s3").Bucket("cgws")
+    	    bucket.download_file("{}.mp3".format(file_id),mp3)
+	except:
+	    logger.warning("File {} does not exist on S3.".format(file_id))
+	    return
+	    
 
     # output
     text_out_dir = "/home/aaron/data/deepspeech_data/stm"

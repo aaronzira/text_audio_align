@@ -6,7 +6,10 @@ import subprocess
 
 import boto3
 import gentle
+import logging
 
+logging.basicConfig(filename="test.log",level=logging.INFO,format="%(asctime)s - %(message)s",datefmt="%Y-%m-%d %H:%M:%S")
+logger = logging.getLogger("info_logger")
 
 def clean(text):
     """Clean transcript of timestamps and speaker trackings, metas,
@@ -55,26 +58,35 @@ def data_generator(file_id,max_length=20.0):
     max_length.
     """
 
-    print("Processing file id {}".format(file_id))
+    logger.info("Processing file id {}...".format(file_id))
 
     # transcript
-    txt_file = "/home/aaron/records/{}.txt".format(file_id)
+    txt_file = "/home/aaron/data/records/{}.txt".format(file_id)
 
     # grab audio file from s3
-    mp3 = "./{}.mp3".format(file_id)
-    bucket = boto3.resource("s3").Bucket("cgws")
-    bucket.download_file("{}.mp3".format(file_id),mp3)
+    logger.info("Downloading mp3 from S3...")
+    mp3 = "/home/aaron/data/mp3s/{}.mp3".format(file_id)
+    ### try/except here if there's a chance a file won't be there
+    if not os.path.isfile(mp3):
+    	bucket = boto3.resource("s3").Bucket("cgws")
+    	bucket.download_file("{}.mp3".format(file_id),mp3)
 
     # output
-    text_out_dir = "/home/aaron/deepspeech_data/stm"
-    wav_out_dir = "/home/aaron/deepspeech_data/wav"
+    text_out_dir = "/home/aaron/data/deepspeech_data/stm"
+    wav_out_dir = "/home/aaron/data/deepspeech_data/wav"
 
     # reading json from alignment using gentle
-    with open(txt_file,"r") as tr:
-        transcript = tr.read()
+    logger.info("Reading transcript...")
+    try:
+        with open(txt_file,"r") as tr:
+            transcript = tr.read()
+    except IOError:
+	logger.warning("File {} does not exist.".format(txt_file))
+	return
 
     # split transcript by speaker, and get timestamps (as seconds)
     # of the boundaries of each paragraph
+    logger.info("Splitting transcript by speaker...")
     paragraphs = []
     times = []
     for paragraph in transcript.split("\n"):
@@ -94,16 +106,20 @@ def data_generator(file_id,max_length=20.0):
     # taking one speaker at a time, find unbroken alignments up to max_length
     # and write out corresponding files
     for i,paragraph in enumerate(paragraphs):
+	logger.info("Paragraph {}: \n{}".format(i,paragraph))
+	logger.info("Cleaning and trimming paragraph {}...".format(i))
 
         cleaned = clean(paragraph)
         temp_wav = trim(file_id,mp3,times[i],times[i+1],0,"./temp")
 
         ### didn't want to have to resample again, but not a big deal
+	logger.info("Resampling paragraph {}...".format(i))
         with gentle.resampled(temp_wav) as wav_file:
-            aligner = gentle.ForcedAligner(resources,transcript,
+            aligner = gentle.ForcedAligner(resources,paragraph,
                                            nthreads=multiprocessing.cpu_count(),
                                            disfluency=False,conservative=False,
                                            disfluencies=set(["uh","um"]))
+	    logger.info("Transcribing audio segment {} with gentle...".format(i))
             result = aligner.transcribe(wav_file)
 
         # dictionary of aligned words
@@ -115,6 +131,7 @@ def data_generator(file_id,max_length=20.0):
         current,start,end = None,None,None
 
         # loop through every word as returned from gentle
+	logger.info("Aligning words in paragraph {}...".format(i))
         for catch in aligned["words"]:
 
             # successful capture
@@ -160,13 +177,14 @@ def data_generator(file_id,max_length=20.0):
             current = None
 
         # write strings and split audio into consituent segments
+	logger.info("Writing text and audio segments from paragraph {}...".format(i))
         for result in captures:
             txt_segment = os.path.join(text_out_dir,"{}_{}_{}.txt".format(
                         file_id,
                         "{:07d}".format(int((times[i]+result["start"])*100)),
                         "{:07d}".format(int((times[i]+result["end"])*100))))
             with open(txt_segment,"w") as f:
-                f.write(result["string"])
+                f.write("{}\n".format(result["string"]))
 
             segment = trim(file_id,temp_wav,result["start"],result["end"],
                            times[i],wav_out_dir)
@@ -181,10 +199,13 @@ def data_generator(file_id,max_length=20.0):
 
     # basic logging
     total_dur = get_duration(mp3)
-    print("Wrote {} segments from {}, totalling {} seconds out of a possible {}."\
+    logger.info("Wrote {} segments from {}, totalling {} seconds, out of a possible {}."\
+          .format(total_captures,file_id,captures_dur,total_dur))
+    print("Wrote {} segments from {}, totalling {} seconds, out of a possible {}."\
           .format(total_captures,file_id,captures_dur,total_dur))
 
     # delete entire audio file
     os.remove(mp3)
+    return
 
 

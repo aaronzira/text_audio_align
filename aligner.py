@@ -8,7 +8,7 @@ import boto3
 import gentle
 import logging
 
-logging.basicConfig(filename="test.log",level=logging.INFO,format="%(asctime)s - %(message)s",datefmt="%Y-%m-%d %H:%M:%S")
+logging.basicConfig(filename="alignment.log",level=logging.INFO,format="%(asctime)s - %(levelname)s - %(message)s",datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger("info_logger")
 
 def clean(text):
@@ -109,19 +109,29 @@ def data_generator(file_id,max_length=20.0):
 	logger.info("Paragraph {}: \n{}".format(i,paragraph))
 	logger.info("Cleaning and trimming paragraph {}...".format(i))
 
-        cleaned = clean(paragraph)
-        temp_wav = trim(file_id,mp3,times[i],times[i+1],0,"./temp")
+	paragraph_start, paragraph_end = times[i], times[i+1]
+	if paragraph_end-paragraph_start < .2: continue
 
+        cleaned = clean(paragraph)
+        temp_wav = trim(file_id,mp3,paragraph_start,paragraph_end,0,"./temp")
+
+	result = None
         ### didn't want to have to resample again, but not a big deal
 	logger.info("Resampling paragraph {}...".format(i))
-        with gentle.resampled(temp_wav) as wav_file:
-            aligner = gentle.ForcedAligner(resources,paragraph,
+	try:
+            with gentle.resampled(temp_wav) as wav_file:
+                aligner = gentle.ForcedAligner(resources,cleaned,
                                            nthreads=multiprocessing.cpu_count(),
                                            disfluency=False,conservative=False,
                                            disfluencies=set(["uh","um"]))
-	    logger.info("Transcribing audio segment {} with gentle...".format(i))
-            result = aligner.transcribe(wav_file)
+	        logger.info("Transcribing audio segment {} with gentle...".format(i))
+                result = aligner.transcribe(wav_file)
+	except: 
+	    logger.warning("Paragraph {} - {} ".format(i,sys.exc_info()[2]))
 
+	if not result: 
+	    os.remove(temp_wav)
+	    continue
         # dictionary of aligned words
         aligned = json.loads(result.to_json())
 

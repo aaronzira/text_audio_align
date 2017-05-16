@@ -14,7 +14,7 @@ txt_dir = os.path.join(parent_dir,"stm")
 
 keep_files = []
 
-# get filenames wav directory
+# get filenames from wav directory
 for i,filename in enumerate(os.listdir(wav_dir)):
     if i % 10000 == 0:
         print("Processing file {}".format(i))
@@ -25,7 +25,7 @@ for i,filename in enumerate(os.listdir(wav_dir)):
     samp_rate,data = wav.read(wav_file)
 
     # duration (number of frames divided by framerate) greater than one second
-    if len(data)/float(samp_rate) >= 1.:
+    if len(data)/float(samp_rate) >= 1:
 
         txt_file = os.path.join(txt_dir,"{}.txt".format(fid))
         with open(txt_file) as raw_text:

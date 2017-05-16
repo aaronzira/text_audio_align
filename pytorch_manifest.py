@@ -33,16 +33,8 @@ for i,filename in enumerate(os.listdir(wav_dir)):
 
             # at least two words in transcript
             if len(transcript.split()) > 1 :
+                keep_files.append("{},{}".format(wav_file,txt_file))
 
-                # probably not necessary, but no accented characters
-                # will NOT catch escaped code points such as "\xe9"
-                try:
-                    transcript.decode("ascii")
-                except UnicodeDecodeError:
-                    print(txt_file)
-                    continue
-                else:
-                    keep_files.append("{},{}".format(wav_file,txt_file))
-
+# write out all acceptable files to the same file
 with open(args.out_file,"w") as out:
     out.write("\n".join(keep_files))

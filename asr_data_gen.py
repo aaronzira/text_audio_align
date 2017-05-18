@@ -8,6 +8,7 @@ if len(sys.argv) != 2:
     sys.exit()
 
 filename = sys.argv[1]
-data_generator(filename)
+seed = ord(filename[-1])
+data_generator(filename,seed)
 
 

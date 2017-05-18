@@ -4,6 +4,7 @@ import re
 import multiprocessing
 import json
 import subprocess
+import random
 
 import boto3
 import gentle
@@ -52,12 +53,15 @@ def get_duration(audio_file):
 
     return duration
 
-def data_generator(file_id,max_length=20.0):
+def data_generator(file_id,seed):
     """Given a file id, align the audio and text versions after dividing into
     single-speaker utterances, and write out texts of unbroken captured strings
     with their corresponding audio segments when the latter are less than
-    max_length.
+    max_length seconds.
     """
+
+    random.seed(seed)
+    max_length = random.randint(5,20)
 
     logger.info("Processing file id {}...".format(file_id))
 
@@ -65,17 +69,17 @@ def data_generator(file_id,max_length=20.0):
     txt_file = "/home/aaron/data/records/{}.txt".format(file_id)
 
     # grab audio file from s3
-    logger.info("Downloading mp3 from S3...")
     mp3 = "/home/aaron/data/mp3s/{}.mp3".format(file_id)
-    
+
     if not os.path.isfile(mp3):
-	try:
-    	    bucket = boto3.resource("s3").Bucket("cgws")
-    	    bucket.download_file("{}.mp3".format(file_id),mp3)
-	except:
-	    logger.warning("File {} does not exist on S3.".format(file_id))
-	    return
-	    
+        bucket = boto3.resource("s3").Bucket("cgws")
+        try:
+            logger.info("Downloading file {} from S3...".format(file_id))
+            bucket.download_file("{}.mp3".format(file_id),mp3)
+        except:
+            logger.warning("File {} does not exist on S3.".format(file_id))
+            return
+
 
     # output
     text_out_dir = "/home/aaron/data/deepspeech_data/stm"
@@ -87,8 +91,8 @@ def data_generator(file_id,max_length=20.0):
         with open(txt_file,"r") as tr:
             transcript = tr.read()
     except IOError:
-	logger.warning("File {} does not exist.".format(txt_file))
-	return
+        logger.warning("File {} does not exist.".format(txt_file))
+        return
 
     # split transcript by speaker, and get timestamps (as seconds)
     # of the boundaries of each paragraph
@@ -112,32 +116,32 @@ def data_generator(file_id,max_length=20.0):
     # taking one speaker at a time, find unbroken alignments up to max_length
     # and write out corresponding files
     for i,paragraph in enumerate(paragraphs):
-	logger.info("Paragraph {}: \n{}".format(i,paragraph))
-	logger.info("Cleaning and trimming paragraph {}...".format(i))
+        logger.info("Paragraph {}: \n{}".format(i,paragraph))
+        logger.info("Cleaning and trimming paragraph {}...".format(i))
 
-	paragraph_start, paragraph_end = times[i], times[i+1]
-	if paragraph_end-paragraph_start < .2: continue
+        paragraph_start, paragraph_end = times[i], times[i+1]
+        if paragraph_end-paragraph_start < .2: continue
 
         cleaned = clean(paragraph)
         temp_wav = trim(file_id,mp3,paragraph_start,paragraph_end,0,"./temp")
 
-	result = None
+        result = None
         ### didn't want to have to resample again, but not a big deal
-	logger.info("Resampling paragraph {}...".format(i))
-	try:
+        logger.info("Resampling paragraph {}...".format(i))
+        try:
             with gentle.resampled(temp_wav) as wav_file:
                 aligner = gentle.ForcedAligner(resources,cleaned,
                                            nthreads=multiprocessing.cpu_count(),
                                            disfluency=False,conservative=False,
                                            disfluencies=set(["uh","um"]))
-	        logger.info("Transcribing audio segment {} with gentle...".format(i))
+                logger.info("Transcribing audio segment {} with gentle...".format(i))
                 result = aligner.transcribe(wav_file)
-	except: 
-	    logger.warning("Paragraph {} - {} ".format(i,sys.exc_info()[2]))
+        except:
+            logger.warning("Paragraph {} - {} ".format(i,sys.exc_info()[2]))
 
-	if not result: 
-	    os.remove(temp_wav)
-	    continue
+        if not result:
+            os.remove(temp_wav)
+            continue
         # dictionary of aligned words
         aligned = json.loads(result.to_json())
 
@@ -147,7 +151,7 @@ def data_generator(file_id,max_length=20.0):
         current,start,end = None,None,None
 
         # loop through every word as returned from gentle
-	logger.info("Aligning words in paragraph {}...".format(i))
+        logger.info("Aligning words in paragraph {}...".format(i))
         for catch in aligned["words"]:
 
             # successful capture
@@ -170,6 +174,7 @@ def data_generator(file_id,max_length=20.0):
                                         "string":current,
                                         "duration":round(end_time-start_time,2)})
 
+                        max_length = random.randint(5,20)
                         start_time = catch["start"]
                         current = catch["alignedWord"]
                         end_time = catch["end"]
@@ -193,8 +198,11 @@ def data_generator(file_id,max_length=20.0):
             current = None
 
         # write strings and split audio into consituent segments
-	logger.info("Writing text and audio segments from paragraph {}...".format(i))
+        logger.info("Writing text and audio segments from paragraph {}...".format(i))
         for result in captures:
+            # don't write files shorter than 2 seconds
+            if result["duration"] < 2.: continue
+
             txt_segment = os.path.join(text_out_dir,"{}_{}_{}.txt".format(
                         file_id,
                         "{:07d}".format(int((times[i]+result["start"])*100)),

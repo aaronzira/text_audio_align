@@ -4,6 +4,7 @@ import re
 import multiprocessing
 import json
 import subprocess
+import hashlib
 import random
 
 import boto3
@@ -84,6 +85,7 @@ def data_generator(file_id,seed):
     # output
     text_out_dir = "/home/aaron/data/deepspeech_data/stm"
     wav_out_dir = "/home/aaron/data/deepspeech_data/wav"
+    json_out_dir = "/home/aaron/data/deepspeech_data/alignments"
 
     # reading json from alignment using gentle
     logger.info("Reading transcript...")
@@ -126,24 +128,41 @@ def data_generator(file_id,seed):
         temp_wav = trim(file_id,mp3,paragraph_start,paragraph_end,0,"./temp")
 
         result = None
-        ### didn't want to have to resample again, but not a big deal
-        logger.info("Resampling paragraph {}...".format(i))
-        try:
-            with gentle.resampled(temp_wav) as wav_file:
-                aligner = gentle.ForcedAligner(resources,cleaned,
-                                           nthreads=multiprocessing.cpu_count(),
-                                           disfluency=False,conservative=False,
-                                           disfluencies=set(["uh","um"]))
-                logger.info("Transcribing audio segment {} with gentle...".format(i))
-                result = aligner.transcribe(wav_file)
-        except:
-            logger.warning("Paragraph {} - {} ".format(i,sys.exc_info()[2]))
 
-        if not result:
-            os.remove(temp_wav)
-            continue
-        # dictionary of aligned words
-        aligned = json.loads(result.to_json())
+        paragraph_hash = hashlib.sha1("{}{}{}{}".format(
+                            file_id,paragraph,
+                            paragraph_start,paragraph_end)).hexdigest()
+        json_file = os.path.join(json_out_dir,"{}.json".format(paragraph_hash))
+
+        if not os.path.isfile(json_file):
+
+            logger.info("Resampling paragraph {}...".format(i))
+            try:
+                with gentle.resampled(temp_wav) as wav_file:
+                    aligner = gentle.ForcedAligner(resources,cleaned,
+                                               nthreads=multiprocessing.cpu_count(),
+                                               disfluency=False,conservative=False,
+                                               disfluencies=set(["uh","um"]))
+                    logger.info("Transcribing audio segment {} with gentle...".format(i))
+                    result = aligner.transcribe(wav_file)
+            except:
+                logger.warning("Paragraph {} - {} ".format(i,sys.exc_info()[2]))
+
+            if not result:
+                os.remove(temp_wav)
+                continue
+            # dictionary of aligned words
+            aligned_words = result.to_json()
+            aligned = json.loads(aligned_words)
+
+            with open(json_file,"w") as f:
+                f.write(aligned_words)
+
+        else:
+            logger.info("Found alignment of paragraph {} -- \
+                skipping alignment and transcription by gentle".format(i))
+            with open(json_file) as f:
+                aligned = json.loads(f.read())
 
         # save all consecutively captured strings
         # and keep track of their start and stop times

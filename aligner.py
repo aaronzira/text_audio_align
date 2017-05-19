@@ -6,10 +6,10 @@ import json
 import subprocess
 import hashlib
 import random
+import logging
 
 import boto3
 import gentle
-import logging
 
 logging.basicConfig(level=logging.INFO,format="%(asctime)s - %(levelname)s - %(message)s",datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger("info_logger")
@@ -55,19 +55,16 @@ def get_duration(audio_file):
     return duration
 
 def data_generator(file_id,seed):
-    """Given a file id, align the audio and text versions after dividing into
-    single-speaker utterances, and write out texts of unbroken captured strings
-    with their corresponding audio segments when the latter are less than
-    max_length seconds.
+    """Given a file id and random seed, align the audio and text versions after
+    dividing into single-speaker utterances, and write out texts of unbroken
+    captured strings and their corresponding audio segments when the latter are
+    between 2 and max_length seconds.
     """
 
     random.seed(seed)
     max_length = random.randint(5,20)
 
     logger.info("Processing file id {}...".format(file_id))
-
-    # transcript
-    txt_file = "/home/aaron/data/records/{}.txt".format(file_id)
 
     # grab audio file from s3
     mp3 = "/home/aaron/data/mp3s/{}.mp3".format(file_id)
@@ -87,7 +84,8 @@ def data_generator(file_id,seed):
     wav_out_dir = "/home/aaron/data/deepspeech_data/wav"
     json_out_dir = "/home/aaron/data/deepspeech_data/alignments"
 
-    # reading json from alignment using gentle
+    # transcript
+    txt_file = "/home/aaron/data/records/{}.txt".format(file_id)
     logger.info("Reading transcript...")
     try:
         with open(txt_file,"r") as tr:
@@ -124,22 +122,24 @@ def data_generator(file_id,seed):
         # don't write files shorter than 2 seconds
         if paragraph_end-paragraph_start < 2.: continue
 
-        cleaned = clean(paragraph)
         temp_wav = trim(file_id,mp3,paragraph_start,paragraph_end,0,"./temp")
 
-        result = None
-
+        # unique name of json object to read/write
         paragraph_hash = hashlib.sha1("{}{}{}{}".format(
                             file_id,paragraph,
                             paragraph_start,paragraph_end)).hexdigest()
         json_file = os.path.join(json_out_dir,"{}.json".format(paragraph_hash))
 
+        result = None
+
+        # check if json object has been written from a previous run
         if not os.path.isfile(json_file):
 
             logger.info("Resampling paragraph {}...".format(i))
             try:
                 with gentle.resampled(temp_wav) as wav_file:
                     resources = gentle.Resources()
+                    cleaned = clean(paragraph)
                     aligner = gentle.ForcedAligner(resources,cleaned,
                                                nthreads=multiprocessing.cpu_count(),
                                                disfluency=False,conservative=False,
@@ -152,14 +152,15 @@ def data_generator(file_id,seed):
             if not result:
                 os.remove(temp_wav)
                 continue
-            aligned_words = result.to_json()
 
+            aligned_words = result.to_json()
             with open(json_file,"w") as f:
                 f.write(aligned_words)
 
         else:
             logger.info("Found alignment of paragraph {} -- \
                 skipping alignment and transcription by gentle".format(i))
+
         # dictionary of aligned words
         with open(json_file) as f:
             aligned = json.loads(f.read())
@@ -242,11 +243,7 @@ def data_generator(file_id,seed):
     total_dur = get_duration(mp3)
     logger.info("Wrote {} segments from {}, totalling {} seconds, out of a possible {}."\
           .format(total_captures,file_id,captures_dur,total_dur))
-    print("Wrote {} segments from {}, totalling {} seconds, out of a possible {}."\
-          .format(total_captures,file_id,captures_dur,total_dur))
 
-    # delete entire audio file
-    os.remove(mp3)
     return
 
 

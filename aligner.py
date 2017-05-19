@@ -113,7 +113,6 @@ def data_generator(file_id,seed):
     times.append(file_end)
 
     total_captures,captures_dur = 0,0
-    resources = gentle.Resources()
 
     # taking one speaker at a time, find unbroken alignments up to max_length
     # and write out corresponding files
@@ -122,7 +121,8 @@ def data_generator(file_id,seed):
         logger.info("Cleaning and trimming paragraph {}...".format(i))
 
         paragraph_start, paragraph_end = times[i], times[i+1]
-        if paragraph_end-paragraph_start < .2: continue
+        # don't write files shorter than 2 seconds
+        if paragraph_end-paragraph_start < 2.: continue
 
         cleaned = clean(paragraph)
         temp_wav = trim(file_id,mp3,paragraph_start,paragraph_end,0,"./temp")
@@ -139,6 +139,7 @@ def data_generator(file_id,seed):
             logger.info("Resampling paragraph {}...".format(i))
             try:
                 with gentle.resampled(temp_wav) as wav_file:
+                    resources = gentle.Resources()
                     aligner = gentle.ForcedAligner(resources,cleaned,
                                                nthreads=multiprocessing.cpu_count(),
                                                disfluency=False,conservative=False,
@@ -151,9 +152,7 @@ def data_generator(file_id,seed):
             if not result:
                 os.remove(temp_wav)
                 continue
-            # dictionary of aligned words
             aligned_words = result.to_json()
-            aligned = json.loads(aligned_words)
 
             with open(json_file,"w") as f:
                 f.write(aligned_words)
@@ -161,8 +160,9 @@ def data_generator(file_id,seed):
         else:
             logger.info("Found alignment of paragraph {} -- \
                 skipping alignment and transcription by gentle".format(i))
-            with open(json_file) as f:
-                aligned = json.loads(f.read())
+        # dictionary of aligned words
+        with open(json_file) as f:
+            aligned = json.loads(f.read())
 
         # save all consecutively captured strings
         # and keep track of their start and stop times
@@ -219,8 +219,6 @@ def data_generator(file_id,seed):
         # write strings and split audio into consituent segments
         logger.info("Writing text and audio segments from paragraph {}...".format(i))
         for result in captures:
-            # don't write files shorter than 2 seconds
-            if result["duration"] < 2.: continue
 
             txt_segment = os.path.join(text_out_dir,"{}_{}_{}.txt".format(
                         file_id,

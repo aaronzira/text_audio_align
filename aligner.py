@@ -119,8 +119,9 @@ def data_generator(file_id,seed):
         logger.info("Cleaning and trimming paragraph {}...".format(i))
 
         paragraph_start, paragraph_end = times[i], times[i+1]
-        # don't write files shorter than 2 seconds
+        # don't bother with short files
         if paragraph_end-paragraph_start < 2.: continue
+        if len(paragraph.split()) < 2: continue
 
         temp_wav = trim(file_id,mp3,paragraph_start,paragraph_end,0,"./temp")
 
@@ -220,6 +221,9 @@ def data_generator(file_id,seed):
         # write strings and split audio into consituent segments
         logger.info("Writing text and audio segments from paragraph {}...".format(i))
         for result in captures:
+            # don't write short files
+            if result["duration"] < 2.: continue
+            if len(result["string"].split()) < 2: continue
 
             txt_segment = os.path.join(text_out_dir,"{}_{}_{}.txt".format(
                         file_id,

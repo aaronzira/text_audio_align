@@ -75,7 +75,7 @@ def data_generator(file_id,seed):
         try:
             bucket.download_file("{}.mp3".format(file_id),mp3)
         except:
-            logger.warning("File {} does not exist on S3.".format(file_id))
+            logger.warning("Could not download file {} from S3.".format(file_id))
             return
 
 
@@ -86,7 +86,7 @@ def data_generator(file_id,seed):
 
     # transcript
     txt_file = "/home/aaron/data/records/{}.txt".format(file_id)
-    logger.info("Reading transcript...")
+    logger.info("Reading transcript {}...".format(file_id))
     try:
         with open(txt_file,"r") as tr:
             transcript = tr.read()
@@ -115,13 +115,16 @@ def data_generator(file_id,seed):
     # taking one speaker at a time, find unbroken alignments up to max_length
     # and write out corresponding files
     for i,paragraph in enumerate(paragraphs):
-        logger.info("Paragraph {}: \n{}".format(i,paragraph))
-        logger.info("Cleaning and trimming paragraph {}...".format(i))
+        logger.info("Cleaning and trimming paragraph {}: \n{}".format(i,paragraph))
 
         paragraph_start, paragraph_end = times[i], times[i+1]
         # don't bother with short files
-        if paragraph_end-paragraph_start < 2.: continue
-        if len(paragraph.split()) < 2: continue
+        if paragraph_end-paragraph_start < 2.:
+            logger.info("Skipping paragraph {} (too short)...".format(i))
+            continue
+        if len(paragraph.split()) < 2:
+            logger.info("Skipping paragraph {} (too few words)...".format(i))
+            continue
 
         temp_wav = trim(file_id,mp3,paragraph_start,paragraph_end,0,"./temp")
 
@@ -135,12 +138,14 @@ def data_generator(file_id,seed):
 
         # check if json object has been written from a previous run
         if not os.path.isfile(json_file):
+            logger.info("JSON file with hash {} not found.".format(paragraph_hash))
 
-            logger.info("Resampling paragraph {}...".format(i))
             try:
+                logger.info("Resampling paragraph {}...".format(i))
                 with gentle.resampled(temp_wav) as wav_file:
                     resources = gentle.Resources()
                     cleaned = clean(paragraph)
+                    logger.info("Aligning paragraph {} with gentle...".format(i))
                     aligner = gentle.ForcedAligner(resources,cleaned,
                                                nthreads=multiprocessing.cpu_count(),
                                                disfluency=False,conservative=False,
@@ -149,8 +154,6 @@ def data_generator(file_id,seed):
                     result = aligner.transcribe(wav_file)
             except:
                 logger.warning("Paragraph {} - {} ".format(i,sys.exc_info()[2]))
-
-            if not result:
                 os.remove(temp_wav)
                 continue
 
@@ -158,9 +161,13 @@ def data_generator(file_id,seed):
             with open(json_file,"w") as f:
                 f.write(aligned_words)
 
+            if not result:
+                logger.info("Empty result for paragraph {}.".format(i))
+                os.remove(temp_wav)
+                continue
+
         else:
-            logger.info("Found alignment of paragraph {} -- \
-                skipping alignment and transcription by gentle".format(i))
+            logger.info("Found JSON of paragraph {} -- skipping alignment and transcription by gentle".format(i))
 
         # dictionary of aligned words
         with open(json_file) as f:
@@ -172,7 +179,13 @@ def data_generator(file_id,seed):
         current,start,end = None,None,None
 
         # loop through every word as returned from gentle
-        logger.info("Aligning words in paragraph {}...".format(i))
+        logger.info("Capturing strings in paragraph {}...".format(i))
+
+        if not "words" in aligned:
+            logger.info("No words in paragraph {}.".format(i))
+            os.remove(temp_wav)
+            continue
+
         for catch in aligned["words"]:
 
             # successful capture
@@ -222,8 +235,14 @@ def data_generator(file_id,seed):
         logger.info("Writing text and audio segments from paragraph {}...".format(i))
         for result in captures:
             # don't write short files
-            if result["duration"] < 2.: continue
-            if len(result["string"].split()) < 2: continue
+            if result["duration"] < 2.:
+                logger.info("Skipping paragraph {} (too short)...".format(i))
+                os.remove(temp_wav)
+                continue
+            if len(result["string"].split()) < 2:
+                logger.info("Skipping paragraph {} (too few words)...".format(i))
+                os.remove(temp_wav)
+                continue
 
             txt_segment = os.path.join(text_out_dir,"{}_{}_{}.txt".format(
                         file_id,

@@ -54,15 +54,19 @@ def get_duration(audio_file):
 
     return duration
 
-def data_generator(file_id,seed):
+def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
     """Given a file id and random seed, align the audio and text versions after
     dividing into single-speaker utterances, and write out texts of unbroken
     captured strings and their corresponding audio segments when the latter are
     between 2 and max_length seconds.
     """
 
-    random.seed(seed)
-    max_length = random.randint(5,20)
+    if randomize:
+        seed = ord(file_id[-1])
+        random.seed(seed)
+        max_length = random.randint(max_dur[0],max_dur[1])
+    else:
+        max_length = max_dur[1]
 
     logger.info("Processing file id {}...".format(file_id))
 
@@ -119,7 +123,7 @@ def data_generator(file_id,seed):
 
         paragraph_start, paragraph_end = times[i], times[i+1]
         # don't bother with short files
-        if paragraph_end-paragraph_start < 2.:
+        if paragraph_end-paragraph_start < min_dur:
             logger.info("Skipping paragraph {} (too short)...".format(i))
             continue
         if len(paragraph.split()) < 2:
@@ -208,7 +212,8 @@ def data_generator(file_id,seed):
                                         "string":current,
                                         "duration":round(end_time-start_time,2)})
 
-                        max_length = random.randint(5,20)
+                        if randomize:
+                            max_length = random.randint(max_dur[0],max_dur[1])
                         start_time = catch["start"]
                         current = catch["alignedWord"]
                         end_time = catch["end"]
@@ -235,7 +240,7 @@ def data_generator(file_id,seed):
         logger.info("Writing text and audio segments from paragraph {}...".format(i))
         for result in captures:
             # don't write short files
-            if result["duration"] < 2.:
+            if result["duration"] < min_dur:
                 logger.info("Skipping paragraph {} (too short)...".format(i))
                 os.remove(temp_wav)
                 continue

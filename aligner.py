@@ -54,6 +54,15 @@ def get_duration(audio_file):
 
     return duration
 
+def save_capture(capture_list,start,end,strings):
+    """Save the current successfully captured words and times to capture_list"""
+
+    capture = {"start":start,"end":end,"string":" ".join(strings),
+                "duration":round(end-start,2)}
+    capture_list.append(capture)
+
+    return
+
 def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
     """Given a file id and random seed, align the audio and text versions after
     dividing into single-speaker utterances, and write out texts of unbroken
@@ -180,7 +189,7 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
         # save all consecutively captured strings
         # and keep track of their start and stop times
         captures = []
-        current,start,end = None,None,None
+        current,start_time,end_time = [],0,0
 
         # loop through every word as returned from gentle
         logger.info("Capturing strings in paragraph {}...".format(i))
@@ -190,51 +199,48 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
             os.remove(temp_wav)
             continue
 
+        # first two seconds will be skipped even if it contains a capture
         for catch in aligned["words"]:
 
             # successful capture
             if catch["case"] == "success" and catch["alignedWord"] != "<unk>":
 
-                # beginning of a capture group
+                # new capture group
                 if not current:
-                    start_time = catch["start"]
-                    current = catch["alignedWord"]
-                    end_time = catch["end"]
+                    # begin capturing if it has been two seconds since the last word
+                    if catch["start"]-end_time > 2:
+                        current = [catch["alignedWord"]]
+                        start_time = catch["start"]
+                        end_time = catch["end"]
 
                 # continuation of a capture group
                 else:
-                    running_time = catch["end"]-start_time
+                    # large gap between last capture and this one
+                    # likely that something was missing in the transcript
+                    if catch["start"]-end_time > .5:
+                        save_capture(captures,start_time,end_time,current)
+                        current = []
 
-                    # save current alignment and start another if adding this
-                    # word would exceed max_length
-                    if running_time >= max_length:
-                        captures.append({"start":start_time,"end":end_time,
-                                        "string":current,
-                                        "duration":round(end_time-start_time,2)})
-
+                    # adding this word would equal or exceed max_length
+                    elif catch["end"]-start_time >= max_length:
+                        save_capture(captures,start_time,end_time,current)
+                        current = []
                         if randomize:
                             max_length = random.randint(max_dur[0],max_dur[1])
-                        start_time = catch["start"]
-                        current = catch["alignedWord"]
-                        end_time = catch["end"]
 
                     # continue capturing
                     else:
-                        current = " ".join([current,catch["alignedWord"]])
+                        current.append(catch["alignedWord"])
                         end_time = catch["end"]
 
             # a miss after prior success(es)
             elif current:
-                captures.append({"start":start_time,"end":end_time,
-                                "string":current,
-                                "duration":round(end_time-start_time,2)})
-                current = None
+                save_capture(captures,start_time,end_time,current)
+                current = []
 
         # last word was a success but current capture hasn't been saved yet
         if current:
-            captures.append({"start":start_time,"end":end_time,
-                "string":current,"duration":round(end_time-start_time,2)})
-            current = None
+            save_capture(captures,start_time,end_time,current)
 
         # write strings and split audio into consituent segments
         logger.info("Writing text and audio segments from paragraph {}...".format(i))
@@ -258,6 +264,7 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
 
             segment = trim(file_id,temp_wav,result["start"],result["end"],
                            times[i],wav_out_dir)
+            # make sure durations match
             segment_dur = get_duration(segment)
             assert segment_dur - result["duration"] <= .01
 
@@ -267,7 +274,7 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
         # delete the clip of this speaker
         os.remove(temp_wav)
 
-    # basic logging
+    # per-file logging
     total_dur = get_duration(mp3)
     logger.info("Wrote {} segments from {}, totalling {} seconds, out of a possible {}."\
           .format(total_captures,file_id,captures_dur,total_dur))

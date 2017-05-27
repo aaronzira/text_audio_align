@@ -92,9 +92,10 @@ if __name__ == '__main__':
 
     wav = os.path.join("/tmp", "{}.wav".format(file_id))
     if not os.path.isfile(wav):
+        FNULL = open(os.devnull, 'w')
         subprocess.call(["sox","{}".format(mp3),"-r","16k",
                     "{}".format(wav),
-                    "remix","-"])
+                    "remix","-"], stdout=FULL, stderr=FNULL)
 
     # split transcript by speaker, and get timestamps (as seconds)
     # of the boundaries of each paragraph

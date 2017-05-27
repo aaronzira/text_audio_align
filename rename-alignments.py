@@ -95,7 +95,7 @@ if __name__ == '__main__':
         FNULL = open(os.devnull, 'w')
         subprocess.call(["sox","{}".format(mp3),"-r","16k",
                     "{}".format(wav),
-                    "remix","-"], stdout=FULL, stderr=FNULL)
+                    "remix","-"], stdout=FNULL, stderr=FNULL)
 
     # split transcript by speaker, and get timestamps (as seconds)
     # of the boundaries of each paragraph

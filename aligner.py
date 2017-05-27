@@ -48,9 +48,11 @@ def trim(base_filename,audio_file,start,end,offset,out_directory):
                                    "{:07d}".format(int((offset+end)*100))))
 
     duration = end-start
-    subprocess.call(["sox","{}".format(audio_file),"-r","16k",
-                "{}".format(segment),"trim","{}".format(start),
-                "{}".format(duration),"remix","-"])
+
+    if not os.path.isfile(segment):
+        subprocess.call(["sox","{}".format(audio_file),"-r","16k",
+                    "{}".format(segment),"trim","{}".format(start),
+                    "{}".format(duration),"remix","-"])
 
     return segment
 

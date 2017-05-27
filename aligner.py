@@ -247,10 +247,10 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
         for result in captures:
             # don't write short files
             if result["duration"] < min_dur:
-                logger.info("Skipping paragraph {} (too short)...".format(i))
+                logger.info("Skipping capture from paragraph {} (too short)...".format(i))
                 continue
             if len(result["string"].split()) < 2:
-                logger.info("Skipping paragraph {} (too few words)...".format(i))
+                logger.info("Skipping capture from paragraph {} (too few words)...".format(i))
                 continue
 
             txt_segment = os.path.join(text_out_dir,"{}_{}_{}.txt".format(

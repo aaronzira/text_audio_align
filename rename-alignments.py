@@ -43,7 +43,7 @@ def trim(base_filename,audio_file,start,end,offset,out_directory):
     duration = end-start
     subprocess.call(["sox","{}".format(audio_file),"-r","16k",
                 "{}".format(segment),"trim","{}".format(start),
-                "{}".format(duration),"remix","-"])
+                "{}".format(duration),"remix","-", "1>/dev/null", "2>&1"])
 
     return segment
 
@@ -132,3 +132,5 @@ if __name__ == '__main__':
 
         new_json_file = os.path.join(json_out_dir,"{}_{}_{}.json".format(file_id, paragraph_start, paragraph_end))
         copyfile(json_file, new_json_file)
+
+        print("processed " + file_id)

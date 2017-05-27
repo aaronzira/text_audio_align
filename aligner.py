@@ -145,12 +145,13 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
         temp_wav = trim(file_id,mp3,paragraph_start,paragraph_end,0,"/tmp")
 
         # unique name of json object to read/write
+        paragraph_hash = hashlib.sha1("{}{}{}{}".format(
+                            file_id,paragraph,
+                            paragraph_start,paragraph_end)).hexdigest()
+
         if use_filename_json is True:
             json_file = os.path.join(json_out_dir,"{}_{}_{}.json".format(file_id, paragraph_start, paragraph_end))
         else:
-            paragraph_hash = hashlib.sha1("{}{}{}{}".format(
-                                file_id,paragraph,
-                                paragraph_start,paragraph_end)).hexdigest()
             json_file = os.path.join(json_out_dir,"{}.json".format(paragraph_hash))
 
         result = None

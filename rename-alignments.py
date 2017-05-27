@@ -87,8 +87,8 @@ if __name__ == '__main__':
         try:
             bucket.download_file("{}.mp3".format(file_id),mp3)
         except:
-            logger.warning("Could not download file {} from S3.".format(file_id))
-            return
+            print("Could not download file {} from S3.".format(file_id))
+            sys.exit()
 
     # split transcript by speaker, and get timestamps (as seconds)
     # of the boundaries of each paragraph

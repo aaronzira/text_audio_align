@@ -7,12 +7,21 @@ import subprocess
 import hashlib
 import random
 import logging
+import argparse
 
 import boto3
 import gentle
 
 logging.basicConfig(level=logging.INFO,format="%(asctime)s - %(levelname)s - %(message)s",datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger("info_logger")
+
+data_dir = '/home/aaron/data'
+records_dir = os.path.join(data_dir, 'records')
+mp3_dir = os.path.join(data_dir, 'mp3s')
+text_out_dir = os.path.join(data_dir, 'deepspeech_data/stm')
+wav_out_dir = os.path.join(data_dir, 'deepspeech_data/wav')
+json_out_dir = os.path.join(data_dir, 'deepspeech_data/alignments')
+use_filename_json = False
 
 def clean(text):
     """Clean transcript of timestamps and speaker trackings, metas,
@@ -80,7 +89,7 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
     logger.info("Processing file id {}...".format(file_id))
 
     # grab audio file from s3
-    mp3 = "/home/aaron/data/mp3s/{}.mp3".format(file_id)
+    mp3 = os.path.join(mp3_dir, "{}.mp3".format(file_id))
 
     if not os.path.isfile(mp3):
         bucket = boto3.resource("s3").Bucket("cgws")
@@ -91,14 +100,8 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
             logger.warning("Could not download file {} from S3.".format(file_id))
             return
 
-
-    # output
-    text_out_dir = "/home/aaron/data/deepspeech_data/stm"
-    wav_out_dir = "/home/aaron/data/deepspeech_data/wav"
-    json_out_dir = "/home/aaron/data/deepspeech_data/alignments"
-
     # transcript
-    txt_file = "/home/aaron/data/records/{}.txt".format(file_id)
+    txt_file = os.path.join(records_dir, "{}.txt".format(file_id))
     logger.info("Reading transcript {}...".format(file_id))
     try:
         with open(txt_file,"r") as tr:
@@ -139,13 +142,16 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
             logger.info("Skipping paragraph {} (too few words)...".format(i))
             continue
 
-        temp_wav = trim(file_id,mp3,paragraph_start,paragraph_end,0,"./temp")
+        temp_wav = trim(file_id,mp3,paragraph_start,paragraph_end,0,"/tmp")
 
         # unique name of json object to read/write
-        paragraph_hash = hashlib.sha1("{}{}{}{}".format(
-                            file_id,paragraph,
-                            paragraph_start,paragraph_end)).hexdigest()
-        json_file = os.path.join(json_out_dir,"{}.json".format(paragraph_hash))
+        if use_filename_json is True:
+            json_file = os.path.join(json_out_dir,"{}_{}_{}.json".format(file_id, paragraph_start, paragraph_end))
+        else:
+            paragraph_hash = hashlib.sha1("{}{}{}{}".format(
+                                file_id,paragraph,
+                                paragraph_start,paragraph_end)).hexdigest()
+            json_file = os.path.join(json_out_dir,"{}.json".format(paragraph_hash))
 
         result = None
 
@@ -201,14 +207,13 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
 
         # first two seconds will be skipped even if it contains a capture
         for catch in aligned["words"]:
-
             # successful capture
-            if catch["case"] == "success" and catch["alignedWord"] != "<unk>":
+            if catch["case"] == "success" and catch["alignedWord"] != "<unk>" and catch['start'] > 5 and catch['end'] - catch['start'] > .07:
 
                 # new capture group
                 if not current:
                     # begin capturing if it has been two seconds since the last word
-                    if catch["start"]-end_time > 2:
+                    if catch["start"]-end_time > 1:
                         current = [catch["alignedWord"]]
                         start_time = catch["start"]
                         end_time = catch["end"]
@@ -217,7 +222,7 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
                 else:
                     # large gap between last capture and this one
                     # likely that something was missing in the transcript
-                    if catch["start"]-end_time > .5:
+                    if catch["start"]-end_time > 1:
                         save_capture(captures,start_time,end_time,current)
                         current = []
 
@@ -274,9 +279,24 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
 
     # per-file logging
     total_dur = get_duration(mp3)
-    logger.info("Wrote {} segments from {}, totalling {} seconds, out of a possible {}."\
-          .format(total_captures,file_id,captures_dur,total_dur))
+    logger.info("Wrote {} segments from {}, totalling {} seconds, out of a possible {}, ratio {:.2f}."\
+          .format(total_captures,file_id,captures_dur,total_dur,captures_dur/total_dur))
 
     return
 
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Generate deepspeech data from Scribie transcripts')
+    parser.add_argument('file_id', type=str, help='file id to process')
+    parser.add_argument('--data_dir', type=str, help='path to data dir', default='/home/rajiv/host/align')
+    parser.add_argument('--use_filename_json', type=bool, help='read alignment json from filename_start_end.json file', default=True)
+    args = parser.parse_args()
 
+    data_dir = args.data_dir
+    records_dir = args.data_dir
+    mp3_dir = args.data_dir
+    text_out_dir = args.data_dir
+    wav_out_dir = args.data_dir
+    json_out_dir = args.data_dir
+    use_filename_json = True
+
+    data_generator(args.file_id)

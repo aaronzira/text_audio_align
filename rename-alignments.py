@@ -6,7 +6,6 @@ import json
 import subprocess
 import hashlib
 import random
-import logging
 from shutil import copyfile
 import argparse
 
@@ -16,9 +15,6 @@ import gentle
 parser = argparse.ArgumentParser(description='Generate paragraph alignments from Scribie transcripts')
 parser.add_argument('file_id', type=str, help='file id to process')
 args = parser.parse_args()
-
-logging.basicConfig(level=logging.INFO,format="%(asctime)s - %(levelname)s - %(message)s",datefmt="%Y-%m-%d %H:%M:%S")
-logger = logging.getLogger("info_logger")
 
 def clean(text):
     """Clean transcript of timestamps and speaker trackings, metas,
@@ -75,18 +71,15 @@ if __name__ == '__main__':
     #txt_file = "/home/rajiv/host/align/{}.txt".format(file_id)
     #mp3 = "/home/rajiv/host/align/{}.mp3".format(file_id)
 
-    logger.info("Reading transcript {}...".format(file_id))
-
     try:
         with open(txt_file,"r") as tr:
             transcript = tr.read()
     except IOError:
-        logger.warning("File {} does not exist.".format(txt_file))
+        print("File {} does not exist.".format(txt_file))
         sys.exit()
 
     # split transcript by speaker, and get timestamps (as seconds)
     # of the boundaries of each paragraph
-    logger.info("Splitting transcript by speaker...")
     paragraphs = []
     times = []
     for paragraph in transcript.split("\n"):
@@ -115,21 +108,17 @@ if __name__ == '__main__':
         json_file = os.path.join(json_out_dir,"{}.json".format(paragraph_hash))
 
         if not os.path.isfile(json_file):
-            logger.info("JSON file with hash {} not found.".format(paragraph_hash))
 
             temp_wav = trim(file_id,mp3,paragraph_start,paragraph_end,0,"/tmp")
 
             try:
-                logger.info("Resampling paragraph {}...".format(i))
                 with gentle.resampled(temp_wav) as wav_file:
                     resources = gentle.Resources()
                     cleaned = clean(paragraph)
-                    logger.info("Aligning paragraph {} with gentle...".format(i))
                     aligner = gentle.ForcedAligner(resources,cleaned,
                                                nthreads=multiprocessing.cpu_count(),
                                                disfluency=False,conservative=False,
                                                disfluencies=set(["uh","um"]))
-                    logger.info("Transcribing audio segment {} with gentle...".format(i))
                     result = aligner.transcribe(wav_file)
 
                 aligned_words = result.to_json()
@@ -138,12 +127,8 @@ if __name__ == '__main__':
 
             except:
                 print(sys.exc_info())
-                sys.exit()
-                logger.warning("Paragraph {} - {} ".format(i,sys.exc_info()[2]))
                 os.remove(temp_wav)
                 continue
-        else:
-            logger.info("Found JSON of paragraph {} -- skipping alignment and transcription by gentle".format(i))
 
         new_json_file = os.path.join(json_out_dir,"{}_{}_{}.json".format(file_id, paragraph_start, paragraph_end))
         copyfile(json_file, new_json_file)

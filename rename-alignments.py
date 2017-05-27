@@ -8,9 +8,48 @@ import hashlib
 import random
 import logging
 from shutil import copyfile
+import argparse
+
+import boto3
+import gentle
+
+parser = argparse.ArgumentParser(description='Generate paragraph alignments from Scribie transcripts')
+parser.add_argument('file_id', type=str, help='file id to process')
+args = parser.parse_args()
 
 logging.basicConfig(level=logging.INFO,format="%(asctime)s - %(levelname)s - %(message)s",datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger("info_logger")
+
+def clean(text):
+    """Clean transcript of timestamps and speaker trackings, metas,
+    punctuation, and extra whitespace.
+    """
+
+    text = re.sub("\d:\d+:\d+\.\d S(\d+|\?): ","",text)
+    text = re.sub("\[.+?\]","",text)
+    text = re.sub("\-"," ",text)
+    text = re.sub(r"[^a-zA-Z0-9\' ]","",text,re.UNICODE)
+    ### don't worry about converting to ascii for now
+    cleaned = re.sub("\s{2,}"," ",text)
+
+    return cleaned
+
+def trim(base_filename,audio_file,start,end,offset,out_directory):
+    """Write out a segment of an audio file to wav, based on start, end,
+    and offset times in seconds.
+    """
+
+    segment = os.path.join(out_directory,"{}_{}_{}.wav".format(
+                                    base_filename,
+                                   "{:07d}".format(int((offset+start)*100)),
+                                   "{:07d}".format(int((offset+end)*100))))
+
+    duration = end-start
+    subprocess.call(["sox","{}".format(audio_file),"-r","16k",
+                "{}".format(segment),"trim","{}".format(start),
+                "{}".format(duration),"remix","-"])
+
+    return segment
 
 def get_duration(audio_file):
     """Determine the length of an audio file in seconds"""
@@ -23,16 +62,19 @@ def get_duration(audio_file):
 
 if __name__ == '__main__':
 
-    file_id = sys.argv[1]
+    file_id = args.file_id
 
     # output
-    text_out_dir = "/home/aaron/data/deepspeech_data/stm"
     wav_out_dir = "/home/aaron/data/deepspeech_data/wav"
     json_out_dir = "/home/aaron/data/deepspeech_data/alignments"
-
-    # transcript
     txt_file = "/home/aaron/data/records/{}.txt".format(file_id)
     mp3 = "/home/aaron/data/mp3s/{}.mp3".format(file_id)
+
+    #wav_out_dir = "/home/rajiv/host/align/"
+    #json_out_dir = "/home/rajiv/host/align/"
+    #txt_file = "/home/rajiv/host/align/{}.txt".format(file_id)
+    #mp3 = "/home/rajiv/host/align/{}.mp3".format(file_id)
+
     logger.info("Reading transcript {}...".format(file_id))
 
     try:
@@ -71,8 +113,34 @@ if __name__ == '__main__':
 
         if not os.path.isfile(json_file):
             logger.info("JSON file with hash {} not found.".format(paragraph_hash))
+
+            temp_wav = trim(file_id,mp3,paragraph_start,paragraph_end,0,"/tmp")
+
+            try:
+                logger.info("Resampling paragraph {}...".format(i))
+                with gentle.resampled(temp_wav) as wav_file:
+                    resources = gentle.Resources()
+                    cleaned = clean(paragraph)
+                    logger.info("Aligning paragraph {} with gentle...".format(i))
+                    aligner = gentle.ForcedAligner(resources,cleaned,
+                                               nthreads=multiprocessing.cpu_count(),
+                                               disfluency=False,conservative=False,
+                                               disfluencies=set(["uh","um"]))
+                    logger.info("Transcribing audio segment {} with gentle...".format(i))
+                    result = aligner.transcribe(wav_file)
+
+                aligned_words = result.to_json()
+                with open(json_file,"w") as f:
+                    f.write(aligned_words)
+
+            except:
+                print(sys.exc_info())
+                sys.exit()
+                logger.warning("Paragraph {} - {} ".format(i,sys.exc_info()[2]))
+                os.remove(temp_wav)
+                continue
         else:
             logger.info("Found JSON of paragraph {} -- skipping alignment and transcription by gentle".format(i))
 
-            new_json_file = os.path.join(json_out_dir,"{}_{}_{}.json".format(file_id, paragraph_start, paragraph_end))
-            copyfile(json_file, new_json_file)
+        new_json_file = os.path.join(json_out_dir,"{}_{}_{}.json".format(file_id, paragraph_start, paragraph_end))
+        copyfile(json_file, new_json_file)

@@ -41,9 +41,10 @@ def trim(base_filename,audio_file,start,end,offset,out_directory):
                                    "{:07d}".format(int((offset+end)*100))))
 
     duration = end-start
+    FNULL = open(os.devnull, 'w')
     subprocess.call(["sox","{}".format(audio_file),"-r","16k",
                 "{}".format(segment),"trim","{}".format(start),
-                "{}".format(duration),"remix","-", "1>/dev/null", "2>&1"])
+                "{}".format(duration),"remix","-"], stdout=FNULL, stderr=FNULL)
 
     return segment
 
@@ -66,10 +67,12 @@ if __name__ == '__main__':
     txt_file = "/home/aaron/data/records/{}.txt".format(file_id)
     mp3 = "/home/aaron/data/mp3s/{}.mp3".format(file_id)
 
-    #wav_out_dir = "/home/rajiv/host/align/"
-    #json_out_dir = "/home/rajiv/host/align/"
-    #txt_file = "/home/rajiv/host/align/{}.txt".format(file_id)
-    #mp3 = "/home/rajiv/host/align/{}.mp3".format(file_id)
+    '''
+    wav_out_dir = "/home/rajiv/host/align/"
+    json_out_dir = "/home/rajiv/host/align/"
+    txt_file = "/home/rajiv/host/align/{}.txt".format(file_id)
+    mp3 = "/home/rajiv/host/align/{}.mp3".format(file_id)
+    '''
 
     try:
         with open(txt_file,"r") as tr:
@@ -133,4 +136,4 @@ if __name__ == '__main__':
         new_json_file = os.path.join(json_out_dir,"{}_{}_{}.json".format(file_id, paragraph_start, paragraph_end))
         copyfile(json_file, new_json_file)
 
-        print("processed " + file_id)
+    print("processed " + file_id)

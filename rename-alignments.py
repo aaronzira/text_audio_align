@@ -82,7 +82,6 @@ if __name__ == '__main__':
 
     if not os.path.isfile(mp3):
         bucket = boto3.resource("s3").Bucket("cgws")
-        logger.info("Downloading file {} from S3...".format(file_id))
         try:
             bucket.download_file("{}.mp3".format(file_id),mp3)
         except:

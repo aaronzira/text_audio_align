@@ -81,6 +81,15 @@ if __name__ == '__main__':
         print("File {} does not exist.".format(txt_file))
         sys.exit()
 
+    if not os.path.isfile(mp3):
+        bucket = boto3.resource("s3").Bucket("cgws")
+        logger.info("Downloading file {} from S3...".format(file_id))
+        try:
+            bucket.download_file("{}.mp3".format(file_id),mp3)
+        except:
+            logger.warning("Could not download file {} from S3.".format(file_id))
+            return
+
     # split transcript by speaker, and get timestamps (as seconds)
     # of the boundaries of each paragraph
     paragraphs = []

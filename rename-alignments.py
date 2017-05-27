@@ -68,10 +68,12 @@ if __name__ == '__main__':
     txt_file = "/home/aaron/data/records/{}.txt".format(file_id)
     mp3 = "/home/aaron/data/mp3s/{}.mp3".format(file_id)
 
+    '''
     wav_out_dir = "/home/rajiv/host/align/"
     json_out_dir = "/home/rajiv/host/align/"
     txt_file = "/home/rajiv/host/align/{}.txt".format(file_id)
     mp3 = "/home/rajiv/host/align/{}.mp3".format(file_id)
+    '''
 
     try:
         with open(txt_file,"r") as tr:
@@ -103,10 +105,8 @@ if __name__ == '__main__':
     file_end = get_duration(mp3)
     times.append(file_end)
 
-    total_captures,captures_dur = 0,0
-
-    pbar = tqdm(total=len(paragraphs))
-    for i,paragraph in enumerate(paragraphs):
+    for i in tqdm(range(len(paragraphs)), desc=file_id, ncols=100):
+        paragraph = paragraphs[i]
         paragraph_start, paragraph_end = times[i], times[i+1]
 
         if paragraph_end - paragraph_start <= 0:
@@ -121,6 +121,9 @@ if __name__ == '__main__':
         if not os.path.isfile(json_file):
 
             temp_wav = trim(file_id,mp3,paragraph_start,paragraph_end,0,"/tmp")
+
+            if not os.path.isfile(temp_wav):
+                continue
 
             try:
                 with gentle.resampled(temp_wav) as wav_file:
@@ -143,8 +146,3 @@ if __name__ == '__main__':
 
         new_json_file = os.path.join(json_out_dir,"{}_{}_{}.json".format(file_id, paragraph_start, paragraph_end))
         copyfile(json_file, new_json_file)
-
-        pbar.update(i)
-
-    print("processed " + file_id)
-    pbar.close()

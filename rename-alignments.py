@@ -90,6 +90,12 @@ if __name__ == '__main__':
             print("Could not download file {} from S3.".format(file_id))
             sys.exit()
 
+    wav = os.path.join("/tmp", "{}.wav".format(file_id))
+    if not os.path.isfile(wav):
+        subprocess.call(["sox","{}".format(mp3),"-r","16k",
+                    "{}".format(wav),
+                    "remix","-"])
+
     # split transcript by speaker, and get timestamps (as seconds)
     # of the boundaries of each paragraph
     paragraphs = []
@@ -120,7 +126,7 @@ if __name__ == '__main__':
 
         if not os.path.isfile(json_file):
 
-            temp_wav = trim(file_id,mp3,paragraph_start,paragraph_end,0,"/tmp")
+            temp_wav = trim(file_id,wav,paragraph_start,paragraph_end,0,"/tmp")
 
             if not os.path.isfile(temp_wav):
                 continue

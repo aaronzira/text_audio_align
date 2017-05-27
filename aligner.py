@@ -102,6 +102,12 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
             logger.warning("Could not download file {} from S3.".format(file_id))
             return
 
+    wav = os.path.join("/tmp", "{}.wav".format(file_id))
+    if not os.path.isfile(wav):
+        subprocess.call(["sox","{}".format(mp3),"-r","16k",
+                    "{}".format(wav),
+                    "remix","-"])
+
     # transcript
     txt_file = os.path.join(records_dir, "{}.txt".format(file_id))
     logger.info("Reading transcript {}...".format(file_id))
@@ -144,7 +150,7 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
             logger.info("Skipping paragraph {} (too few words)...".format(i))
             continue
 
-        temp_wav = trim(file_id,mp3,paragraph_start,paragraph_end,0,"/tmp")
+        temp_wav = trim(file_id,wav,paragraph_start,paragraph_end,0,"/tmp")
 
         # unique name of json object to read/write
         paragraph_hash = hashlib.sha1("{}{}{}{}".format(
@@ -279,6 +285,8 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
 
         # delete the clip of this speaker
         os.remove(temp_wav)
+
+    os.remove(wav)
 
     # per-file logging
     total_dur = get_duration(mp3)

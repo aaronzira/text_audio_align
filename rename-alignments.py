@@ -105,6 +105,9 @@ if __name__ == '__main__':
     for i,paragraph in enumerate(paragraphs):
         paragraph_start, paragraph_end = times[i], times[i+1]
 
+        if paragraph_end - paragraph_start <= 0:
+            continue
+
         # unique name of json object to read/write
         paragraph_hash = hashlib.sha1("{}{}{}{}".format(
                             file_id,paragraph,

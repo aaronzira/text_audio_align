@@ -61,6 +61,8 @@ if __name__ == '__main__':
     total_captures,captures_dur = 0,0
 
     for i,paragraph in enumerate(paragraphs):
+        paragraph_start, paragraph_end = times[i], times[i+1]
+
         # unique name of json object to read/write
         paragraph_hash = hashlib.sha1("{}{}{}{}".format(
                             file_id,paragraph,

@@ -56,14 +56,14 @@ for i in tqdm(range(len(files)), ncols=100, desc='Copying files'):
 
     if not os.path.isfile(dst_wav_file):
         duration = get_duration(wav_file)
-
-        if duration < args.min_seconds or duration > args.max_seconds:
-            continue
-
-        if args.dry_run is False:
-            shutil.copy2(wav_file, dst_wav_file)
     else:
         duration = get_duration(dst_wav_file)
+
+    if duration < args.min_seconds or duration > args.max_seconds:
+        continue
+
+    if args.dry_run is False:
+        shutil.copy2(wav_file, dst_wav_file)
 
     txt_file = os.path.join(txt_dir,"{}.txt".format(fid))
     dst_txt_file = os.path.join(dst_txt, "{}.txt".format(fid))

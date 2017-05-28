@@ -92,18 +92,18 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
 
     # grab audio file from s3
     mp3 = os.path.join(mp3_dir, "{}.mp3".format(file_id))
+    wav = os.path.join(mp3_dir, "{}.wav".format(file_id))
 
-    if not os.path.isfile(mp3):
-        bucket = boto3.resource("s3").Bucket("cgws")
-        logger.info("Downloading file {} from S3...".format(file_id))
-        try:
-            bucket.download_file("{}.mp3".format(file_id),mp3)
-        except:
-            logger.warning("Could not download file {} from S3.".format(file_id))
-            return
-
-    wav = os.path.join("/tmp", "{}.wav".format(file_id))
     if not os.path.isfile(wav):
+        if not os.path.isfile(mp3):
+            bucket = boto3.resource("s3").Bucket("cgws")
+            logger.info("Downloading file {} from S3...".format(file_id))
+            try:
+                bucket.download_file("{}.mp3".format(file_id),mp3)
+            except:
+                logger.warning("Could not download file {} from S3.".format(file_id))
+                return
+
         FNULL = open(os.devnull, 'w')
         subprocess.call(["sox","{}".format(mp3),"-r","16k",
                     "{}".format(wav),

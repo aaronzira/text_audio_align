@@ -65,15 +65,19 @@ if __name__ == '__main__':
     # output
     wav_out_dir = "/home/aaron/data/deepspeech_data/wav"
     json_out_dir = "/home/aaron/data/deepspeech_data/alignments"
+    mp3_dir = "/home/aaron/data/mp3s/"
     txt_file = "/home/aaron/data/records/{}.txt".format(file_id)
-    mp3 = "/home/aaron/data/mp3s/{}.mp3".format(file_id)
 
     '''
     wav_out_dir = "/home/rajiv/host/align/"
     json_out_dir = "/home/rajiv/host/align/"
+    mp3_dir = "/home/rajiv/host/align/"
     txt_file = "/home/rajiv/host/align/{}.txt".format(file_id)
     mp3 = "/home/rajiv/host/align/{}.mp3".format(file_id)
     '''
+
+    mp3 = "{}/{}.mp3".format(mp3_dir,file_id)
+    wav = "{}/{}.wav".format(mp3_dir,file_id)
 
     try:
         with open(txt_file,"r") as tr:
@@ -82,16 +86,15 @@ if __name__ == '__main__':
         print("File {} does not exist.".format(txt_file))
         sys.exit()
 
-    if not os.path.isfile(mp3):
-        bucket = boto3.resource("s3").Bucket("cgws")
-        try:
-            bucket.download_file("{}.mp3".format(file_id),mp3)
-        except:
-            print("Could not download file {} from S3.".format(file_id))
-            sys.exit()
-
-    wav = os.path.join("/tmp", "{}.wav".format(file_id))
     if not os.path.isfile(wav):
+        if not os.path.isfile(mp3):
+            bucket = boto3.resource("s3").Bucket("cgws")
+            try:
+                bucket.download_file("{}.mp3".format(file_id),mp3)
+            except:
+                print("Could not download file {} from S3.".format(file_id))
+                sys.exit()
+
         FNULL = open(os.devnull, 'w')
         subprocess.call(["sox","{}".format(mp3),"-r","16k",
                     "{}".format(wav),

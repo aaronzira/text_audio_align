@@ -20,6 +20,7 @@ parser.add_argument("--min_seconds",default="2",type=float, help="Cutoff for min
 parser.add_argument("--max_seconds",default="20",type=float, help="Cutoff for maximum duration")
 parser.add_argument("--no_ted", help="Merge with TED dataset", action='store_true', default=False)
 parser.add_argument("--dry_run", help="Don't write csv's or copy files", action='store_true', default=False)
+parser.add_argument("--split_ratio", help="Percent of files to keep in val set", type=float, default=0.1)
 args = parser.parse_args()
 
 parent_dir = os.path.abspath(args.data_dir)
@@ -47,7 +48,7 @@ def sort_func(element):
     return element[0]
 
 # get filenames wav directory
-for i in tqdm(range(len(files)), ncols=100, desc='Copying files'):
+for i in tqdm(range(len(files)), ncols=100, desc='Checking files'):
     filename = files[i]
     fid = os.path.splitext(filename)[0]
 
@@ -93,10 +94,10 @@ for i in tqdm(range(len(files)), ncols=100, desc='Copying files'):
 
     keep_files.append((duration, "{},{}".format(dst_wav_file,dst_txt_file)))
 
-train_len = int(len(keep_files) * 0.90)
+val_len = int(len(keep_files) * args.split_ratio)
 
-train_set = keep_files[:train_len]
-val_set = keep_files[train_len:]
+train_set = keep_files[:-val_len]
+val_set = keep_files[-val_len:]
 
 if args.no_ted is False:
     ted_train = []

@@ -287,8 +287,6 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
         # delete the clip of this speaker
         os.remove(temp_wav)
 
-    os.remove(wav)
-
     # per-file logging
     total_dur = get_duration(mp3)
     logger.info("Wrote {} segments from {}, totalling {} seconds, out of a possible {}, ratio {:.2f}."\

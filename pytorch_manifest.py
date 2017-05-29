@@ -137,7 +137,7 @@ h, b = np.histogram(durations, bins=np.arange(args.min_seconds, args.max_seconds
 plt.bar(np.arange(args.min_seconds + 1, args.max_seconds + 1), h, align='center')
 plt.xlabel('Seconds')
 plt.ylabel('# of files')
-plt.grid(color='gray', linestyle='dashed')
+plt.grid(color='gray', linestyle='dotted')
 plt.xticks(np.arange(args.max_seconds + 1))
 plt.title('Durations distribution')
 plt.savefig('durations.png')

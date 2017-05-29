@@ -9,6 +9,7 @@ import random
 from shutil import copyfile
 import argparse
 from tqdm import tqdm
+import traceback
 
 import boto3
 import gentle
@@ -73,7 +74,6 @@ if __name__ == '__main__':
     json_out_dir = "/home/rajiv/host/align/"
     mp3_dir = "/home/rajiv/host/align/"
     txt_file = "/home/rajiv/host/align/{}.txt".format(file_id)
-    mp3 = "/home/rajiv/host/align/{}.mp3".format(file_id)
     '''
 
     mp3 = "{}/{}.mp3".format(mp3_dir,file_id)
@@ -127,32 +127,33 @@ if __name__ == '__main__':
                             file_id,paragraph,
                             paragraph_start,paragraph_end)).hexdigest()
         json_file = os.path.join(json_out_dir,"{}.json".format(paragraph_hash))
-
-        if not os.path.isfile(json_file):
-
-            temp_wav = trim(file_id,wav,paragraph_start,paragraph_end,0,"/tmp")
-
-            if not os.path.isfile(temp_wav):
-                continue
-
-            try:
-                with gentle.resampled(temp_wav) as wav_file:
-                    resources = gentle.Resources()
-                    cleaned = clean(paragraph)
-                    aligner = gentle.ForcedAligner(resources,cleaned,
-                                               nthreads=multiprocessing.cpu_count(),
-                                               disfluency=False,conservative=False,
-                                               disfluencies=set(["uh","um"]))
-                    result = aligner.transcribe(wav_file)
-
-                aligned_words = result.to_json()
-                with open(json_file,"w") as f:
-                    f.write(aligned_words)
-
-            except:
-                print(sys.exc_info())
-                os.remove(temp_wav)
-                continue
-
         new_json_file = os.path.join(json_out_dir,"{}_{}_{}.json".format(file_id, paragraph_start, paragraph_end))
-        copyfile(json_file, new_json_file)
+        if not os.path.isfile(new_json_file):
+            if not os.path.isfile(json_file):
+
+                temp_wav = trim(file_id,wav,paragraph_start,paragraph_end,0,"/tmp")
+
+                if not os.path.isfile(temp_wav):
+                    continue
+
+                try:
+                    with gentle.resampled(temp_wav) as wav_file:
+                        resources = gentle.Resources()
+                        cleaned = clean(paragraph)
+                        aligner = gentle.ForcedAligner(resources,cleaned,
+                                                   nthreads=multiprocessing.cpu_count(),
+                                                   disfluency=False,conservative=False,
+                                                   disfluencies=set(["uh","um"]))
+                        result = aligner.transcribe(wav_file)
+
+                    aligned_words = result.to_json()
+                    with open(json_file,"w") as f:
+                        f.write(aligned_words)
+
+                except:
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+                    print ''.join('!! ' + line for line in lines)
+                    continue
+
+            copyfile(json_file, new_json_file)

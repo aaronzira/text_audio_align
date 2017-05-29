@@ -19,7 +19,7 @@ parser.add_argument("--dst_dir",default=".",type=str, help="Directory to store d
 parser.add_argument("--min_seconds",default="2",type=float, help="Cutoff for minimum duration")
 parser.add_argument("--max_seconds",default="20",type=float, help="Cutoff for maximum duration")
 parser.add_argument("--no_ted", help="Merge with TED dataset", action='store_true', default=False)
-parser.add_argument("--dry_run", help="Don't write csv's or copy files", action='store_true', default=False)
+parser.add_argument("--dry_run", help="Don't write manifest csv's", action='store_true', default=False)
 parser.add_argument("--split_ratio", help="Percent of files to keep in val set", type=float, default=0.1)
 args = parser.parse_args()
 
@@ -48,7 +48,7 @@ def sort_func(element):
     return element[0]
 
 # get filenames wav directory
-for i in tqdm(range(len(files)), ncols=100, desc='Checking files'):
+for i in tqdm(range(len(files)), ncols=100, desc='Copying files'):
     filename = files[i]
     fid = os.path.splitext(filename)[0]
 
@@ -57,14 +57,12 @@ for i in tqdm(range(len(files)), ncols=100, desc='Checking files'):
 
     if not os.path.isfile(dst_wav_file):
         duration = get_duration(wav_file)
+        shutil.copy2(wav_file, dst_wav_file)
     else:
         duration = get_duration(dst_wav_file)
 
     if duration < args.min_seconds or duration > args.max_seconds:
         continue
-
-    if args.dry_run is False:
-        shutil.copy2(wav_file, dst_wav_file)
 
     txt_file = os.path.join(txt_dir,"{}.txt".format(fid))
     dst_txt_file = os.path.join(dst_txt, "{}.txt".format(fid))
@@ -88,9 +86,8 @@ for i in tqdm(range(len(files)), ncols=100, desc='Checking files'):
             print("skipping %s due to oov, %s" % (fid, transcript))
             continue 
 
-        if args.dry_run is False:
-            with open(dst_txt_file, 'w') as f:
-                f.write(transcript + "\n")
+        with open(dst_txt_file, 'w') as f:
+            f.write(transcript + "\n")
 
     keep_files.append((duration, "{},{}".format(dst_wav_file,dst_txt_file)))
 

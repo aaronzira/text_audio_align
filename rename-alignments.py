@@ -14,8 +14,10 @@ import traceback
 import boto3
 import gentle
 
-parser = argparse.ArgumentParser(description='Generate paragraph alignments from Scribie transcripts')
+parser = argparse.ArgumentParser(description='Generate paragraph level alignments from Scribie data')
 parser.add_argument('file_id', type=str, help='file id to process')
+parser.add_argument('--file_index', type=str, help='file index to print', default="1")
+parser.add_argument('--abort', help='Abort if alignemnt already exists', action='store_true', default=False)
 args = parser.parse_args()
 
 def clean(text):
@@ -64,6 +66,7 @@ if __name__ == '__main__':
     file_id = args.file_id
 
     # output
+    '''
     wav_out_dir = "/home/aaron/data/deepspeech_data/wav"
     json_out_dir = "/home/aaron/data/deepspeech_data/alignments"
     mp3_dir = "/home/aaron/data/mp3s/"
@@ -74,7 +77,6 @@ if __name__ == '__main__':
     json_out_dir = "/home/rajiv/host/align/"
     mp3_dir = "/home/rajiv/host/align/"
     txt_file = "/home/rajiv/host/align/{}.txt".format(file_id)
-    '''
 
     mp3 = "{}/{}.mp3".format(mp3_dir,file_id)
     wav = "{}/{}.wav".format(mp3_dir,file_id)
@@ -115,11 +117,11 @@ if __name__ == '__main__':
     file_end = get_duration(mp3)
     times.append(file_end)
 
-    for i in tqdm(range(len(paragraphs)), desc=file_id, ncols=100):
+    for i in tqdm(range(len(paragraphs)), desc="({}) {}".format(args.file_index, file_id), ncols=100):
         paragraph = paragraphs[i]
         paragraph_start, paragraph_end = times[i], times[i+1]
 
-        if paragraph_end - paragraph_start <= 0:
+        if paragraph_end - paragraph_start <= 0.2:
             continue
 
         # unique name of json object to read/write
@@ -128,7 +130,11 @@ if __name__ == '__main__':
                             paragraph_start,paragraph_end)).hexdigest()
         json_file = os.path.join(json_out_dir,"{}.json".format(paragraph_hash))
         new_json_file = os.path.join(json_out_dir,"{}_{}_{}.json".format(file_id, paragraph_start, paragraph_end))
-        if not os.path.isfile(new_json_file):
+        if os.path.isfile(new_json_file):
+            if args.abort:
+                print("aborting")
+                break
+        else:
             if not os.path.isfile(json_file):
 
                 temp_wav = trim(file_id,wav,paragraph_start,paragraph_end,0,"/tmp")
@@ -137,14 +143,13 @@ if __name__ == '__main__':
                     continue
 
                 try:
-                    with gentle.resampled(temp_wav) as wav_file:
-                        resources = gentle.Resources()
-                        cleaned = clean(paragraph)
-                        aligner = gentle.ForcedAligner(resources,cleaned,
-                                                   nthreads=multiprocessing.cpu_count(),
-                                                   disfluency=False,conservative=False,
-                                                   disfluencies=set(["uh","um"]))
-                        result = aligner.transcribe(wav_file)
+                    resources = gentle.Resources()
+                    cleaned = clean(paragraph)
+                    aligner = gentle.ForcedAligner(resources,cleaned,
+                                               nthreads=multiprocessing.cpu_count(),
+                                               disfluency=False,conservative=False,
+                                               disfluencies=set(["uh","um"]))
+                    result = aligner.transcribe(temp_wav)
 
                     aligned_words = result.to_json()
                     with open(json_file,"w") as f:
@@ -153,7 +158,7 @@ if __name__ == '__main__':
                 except:
                     exc_type, exc_value, exc_traceback = sys.exc_info()
                     lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-                    print ''.join('!! ' + line for line in lines)
+                    print ''.join(line for line in lines)
                     continue
 
             copyfile(json_file, new_json_file)

@@ -16,11 +16,11 @@ import matplotlib.pyplot as plt
 parser = argparse.ArgumentParser()
 parser.add_argument("--data_dir",default="/home/aaron/data/deepspeech_data",type=str,help='Directory to read files from')
 parser.add_argument("--dst_dir",default=".",type=str, help="Directory to store dataset to")
-parser.add_argument("--min_seconds",default="2",type=float, help="Cutoff for minimum duration")
-parser.add_argument("--max_seconds",default="20",type=float, help="Cutoff for maximum duration")
+parser.add_argument("--min_seconds",default=0.25,type=float, help="Cutoff for minimum duration")
+parser.add_argument("--max_seconds",default=20.0,type=float, help="Cutoff for maximum duration")
 parser.add_argument("--no_ted", help="Merge with TED dataset", action='store_true', default=False)
 parser.add_argument("--dry_run", help="Don't write manifest csv's", action='store_true', default=False)
-parser.add_argument("--split_ratio", help="Percent of files to keep in val set", type=float, default=0.1)
+parser.add_argument("--split_ratio", help="Percent of files to keep in val set", type=float, default=0.01)
 args = parser.parse_args()
 
 parent_dir = os.path.abspath(args.data_dir)
@@ -42,7 +42,10 @@ files = os.listdir(wav_dir)
 
 def get_duration(wav_file):
     f = sf.SoundFile(wav_file)
-    return float(len(f)/f.samplerate)
+    if f.samplerate != 16000:
+        return 0
+    else:
+        return float(len(f)/f.samplerate)
 
 def sort_func(element):
     return element[0]
@@ -87,7 +90,7 @@ for i in tqdm(range(len(files)), ncols=100, desc='Copying files'):
             continue 
 
         with open(dst_txt_file, 'w') as f:
-            f.write(transcript + "\n")
+            f.write(transcript.upper() + "\n")
 
     keep_files.append((duration, "{},{}".format(dst_wav_file,dst_txt_file)))
 
@@ -96,7 +99,7 @@ val_len = int(len(keep_files) * args.split_ratio)
 train_set = keep_files[:-val_len]
 val_set = keep_files[-val_len:]
 
-if args.no_ted is False:
+if not args.no_ted and not args.dry_run:
     ted_train = []
     for line in open("ted_train_manifest.csv","r"):
         ted_train.append(line)
@@ -118,19 +121,25 @@ if args.no_ted is False:
 train_set.sort(key=sort_func)
 val_set.sort(key=sort_func)
 
-total_train = 0
-with open('train.csv', 'w') as f:
-    for line in train_set:
-        if args.dry_run is False:
+total_train = sum([line[0] for line in train_set])
+if not args.dry_run:
+    with open('train.csv', 'w') as f:
+        for line in train_set:
             f.write((line[1].strip() + "\n").encode('utf-8'))
-        total_train += line[0]
 
-total_val = 0
-with open('val.csv', 'w') as f:
-    for line in val_set:
-        if args.dry_run is False:
+total_val = sum([line[0] for line in val_set])
+if not args.dry_run:
+    with open('val.csv', 'w') as f:
+        for line in val_set:
             f.write((line[1].strip() + "\n").encode('utf-8'))
-        total_val += line[0]
+
+if not args.dry_run:
+    # train_set has already been written so modifying in place is ok
+    np.random.shuffle(train_set)
+    train_subset = train_set[:len(val_set)]
+    with open('train_subset.csv', 'w') as f:
+        for line in train_subset:
+            f.write((line[1].strip() + "\n").encode("utf-8"))
 
 durations = [t[0] for t in train_set]
 h, b = np.histogram(durations, bins=np.arange(args.min_seconds, args.max_seconds + 1))

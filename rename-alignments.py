@@ -66,7 +66,6 @@ if __name__ == '__main__':
     file_id = args.file_id
 
     # output
-    '''
     wav_out_dir = "/home/aaron/data/deepspeech_data/wav"
     json_out_dir = "/home/aaron/data/deepspeech_data/alignments"
     mp3_dir = "/home/aaron/data/mp3s/"
@@ -77,6 +76,7 @@ if __name__ == '__main__':
     json_out_dir = "/home/rajiv/host/align/"
     mp3_dir = "/home/rajiv/host/align/"
     txt_file = "/home/rajiv/host/align/{}.txt".format(file_id)
+    '''
 
     mp3 = "{}/{}.mp3".format(mp3_dir,file_id)
     wav = "{}/{}.wav".format(mp3_dir,file_id)

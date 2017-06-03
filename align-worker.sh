@@ -45,11 +45,11 @@ do
 
         if [ $host == 'eesen-worker' ]
         then
-            touch ~/align/$1.json
+            touch ~/align/${fid}.json
         else 
             while true
             do
-                ssh eesen-worker "touch ~/align/$1.json" 1>/dev/null 2>&1
+                ssh eesen-worker "touch ~/align/${fid}.json" 1>/dev/null 2>&1
                 if [ $? -ne 0 ]
                 then
                     sleep 1

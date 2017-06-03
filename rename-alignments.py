@@ -18,6 +18,7 @@ parser = argparse.ArgumentParser(description='Generate paragraph level alignment
 parser.add_argument('file_id', type=str, help='file id to process')
 parser.add_argument('--file_index', type=str, help='file index to print', default="1")
 parser.add_argument('--abort', help='Abort if alignemnt already exists', action='store_true', default=False)
+parser.add_argument('--threads_multiplier', help='Multiplier for threads', type=int, default=1)
 args = parser.parse_args()
 
 def clean(text):
@@ -132,7 +133,7 @@ if __name__ == '__main__':
         new_json_file = os.path.join(json_out_dir,"{}_{}_{}.json".format(file_id, paragraph_start, paragraph_end))
         if os.path.isfile(new_json_file):
             if args.abort:
-                print("aborting")
+                print(" aborting")
                 break
         else:
             if not os.path.isfile(json_file):
@@ -147,7 +148,7 @@ if __name__ == '__main__':
                         resources = gentle.Resources()
                         cleaned = clean(paragraph)
                         aligner = gentle.ForcedAligner(resources,cleaned,
-                                                   nthreads=multiprocessing.cpu_count(),
+                                                   nthreads=multiprocessing.cpu_count()*args.threads_multiplier,
                                                    disfluency=False,conservative=False,
                                                    disfluencies=set(["uh","um"]))
                         result = aligner.transcribe(wav_file)

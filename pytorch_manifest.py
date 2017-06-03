@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 parser = argparse.ArgumentParser()
 parser.add_argument("--data_dir",default="/home/aaron/data/deepspeech_data",type=str,help='Directory to read files from')
 parser.add_argument("--dst_dir",default=".",type=str, help="Directory to store dataset to")
-parser.add_argument("--min_seconds",default=0.25,type=float, help="Cutoff for minimum duration")
+parser.add_argument("--min_seconds",default=1.0,type=float, help="Cutoff for minimum duration")
 parser.add_argument("--max_seconds",default=20.0,type=float, help="Cutoff for maximum duration")
 parser.add_argument("--no_ted", help="Merge with TED dataset", action='store_true', default=False)
 parser.add_argument("--dry_run", help="Don't write manifest csv's", action='store_true', default=False)
@@ -43,6 +43,7 @@ files = os.listdir(wav_dir)
 def get_duration(wav_file):
     f = sf.SoundFile(wav_file)
     if f.samplerate != 16000:
+        print("sample rate is {}".format(f.samplerate))
         return 0
     else:
         return float(len(f)/f.samplerate)
@@ -141,14 +142,16 @@ if not args.dry_run:
         for line in train_subset:
             f.write((line[1].strip() + "\n").encode("utf-8"))
 
+total = total_train + total_val
+
 durations = [t[0] for t in train_set]
-h, b = np.histogram(durations, bins=np.arange(args.min_seconds, args.max_seconds + 1))
-plt.bar(np.arange(args.min_seconds + 1, args.max_seconds + 1), h, align='center')
+bins = np.arange(int(args.min_seconds), int(args.max_seconds) + 1)
+plt.hist(durations, bins=bins, rwidth=0.8)
 plt.xlabel('Seconds')
 plt.ylabel('# of files')
 plt.grid(color='gray', linestyle='dotted')
-plt.xticks(np.arange(args.max_seconds + 1))
-plt.title('Durations distribution')
+plt.xticks(bins)
+plt.title("Durations distribution @ {} hours".format(int(total/3600)))
 plt.savefig('durations.png')
 
-print("Total {:.2f} hours, train {:.2f} hours, val {:.2f} hours, ratio {:.2f}".format((total_train + total_val)/3600, total_train/3600, total_val/3600, total_val/total_train))
+print("Total {:.2f} hours, train {:.2f} hours, val {:.2f} hours, ratio {:.2f}".format(total/3600, total_train/3600, total_val/3600, total_val/total_train))

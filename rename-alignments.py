@@ -143,17 +143,18 @@ if __name__ == '__main__':
                     continue
 
                 try:
-                    resources = gentle.Resources()
-                    cleaned = clean(paragraph)
-                    aligner = gentle.ForcedAligner(resources,cleaned,
-                                               nthreads=multiprocessing.cpu_count(),
-                                               disfluency=False,conservative=False,
-                                               disfluencies=set(["uh","um"]))
-                    result = aligner.transcribe(temp_wav)
+                    with gentle.resampled(temp_wav) as wav_file:
+                        resources = gentle.Resources()
+                        cleaned = clean(paragraph)
+                        aligner = gentle.ForcedAligner(resources,cleaned,
+                                                   nthreads=multiprocessing.cpu_count(),
+                                                   disfluency=False,conservative=False,
+                                                   disfluencies=set(["uh","um"]))
+                        result = aligner.transcribe(wav_file)
 
-                    aligned_words = result.to_json()
-                    with open(json_file,"w") as f:
-                        f.write(aligned_words)
+                        aligned_words = result.to_json()
+                        with open(json_file,"w") as f:
+                            f.write(aligned_words)
 
                 except:
                     exc_type, exc_value, exc_traceback = sys.exc_info()

@@ -19,6 +19,8 @@ parser.add_argument('file_id', type=str, help='file id to process')
 parser.add_argument('--file_index', type=str, help='file index to print', default="1")
 parser.add_argument('--abort', help='Abort if alignemnt already exists', action='store_true', default=False)
 parser.add_argument('--threads_multiplier', help='Multiplier for threads', type=int, default=1)
+parser.add_argument('--use_align_dir', help='Read/write files from an align  directory', action='store_true', default=False)
+parser.add_argument('--align_dir', help='Path to the align directory', type=str, default='~/align')
 args = parser.parse_args()
 
 def clean(text):
@@ -67,17 +69,14 @@ if __name__ == '__main__':
     file_id = args.file_id
 
     # output
-    wav_out_dir = "/home/aaron/data/deepspeech_data/wav"
-    json_out_dir = "/home/aaron/data/deepspeech_data/alignments"
-    mp3_dir = "/home/aaron/data/mp3s/"
-    txt_file = "/home/aaron/data/records/{}.txt".format(file_id)
-
-    '''
-    wav_out_dir = "/home/rajiv/host/align/"
-    json_out_dir = "/home/rajiv/host/align/"
-    mp3_dir = "/home/rajiv/host/align/"
-    txt_file = "/home/rajiv/host/align/{}.txt".format(file_id)
-    '''
+    if args.use_align_dir:
+        align_dir = wav_out_dir = json_out_dir = mp3_dir = os.path.expanduser(args.align_dir)
+        txt_file = "{}/{}.txt".format(align_dir, file_id)
+    else:
+        wav_out_dir = "/home/aaron/data/deepspeech_data/wav"
+        json_out_dir = "/home/aaron/data/deepspeech_data/alignments"
+        mp3_dir = "/home/aaron/data/mp3s/"
+        txt_file = "/home/aaron/data/records/{}.txt".format(file_id)
 
     mp3 = "{}/{}.mp3".format(mp3_dir,file_id)
     wav = "{}/{}.wav".format(mp3_dir,file_id)
@@ -163,4 +162,9 @@ if __name__ == '__main__':
                     print ''.join(line for line in lines)
                     continue
 
+            os.remove(temp_wav)
             copyfile(json_file, new_json_file)
+
+    if args.use_align_dir:
+        os.remove(wav)
+        os.remove(mp3)

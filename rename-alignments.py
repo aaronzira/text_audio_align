@@ -162,8 +162,10 @@ if __name__ == '__main__':
                     print ''.join(line for line in lines)
                     continue
 
-            os.remove(temp_wav)
             copyfile(json_file, new_json_file)
+
+            if os.path.isfile(temp_wav):
+                os.remove(temp_wav)
 
     if args.use_align_dir:
         os.remove(wav)

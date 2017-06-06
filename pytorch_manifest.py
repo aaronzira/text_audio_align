@@ -36,10 +36,6 @@ dst_txt = os.path.join(dst_dir, "stm")
 if not os.path.exists(dst_txt):
     os.makedirs(dst_txt)
 
-keep_files = []
-
-files = os.listdir(wav_dir)
-
 def get_duration(wav_file):
     f = sf.SoundFile(wav_file)
     if f.samplerate != 16000:
@@ -51,8 +47,23 @@ def get_duration(wav_file):
 def sort_func(element):
     return element[0]
 
+keep_files = []
+files= []
+
+FNULL = open(os.devnull, 'w')
+out, err = subprocess.Popen("find " + wav_dir + " -type f | wc -l", stdout=subprocess.PIPE, shell=True).communicate()
+num_files = int(out)
+
+find = subprocess.Popen(["find", wav_dir, "-type", "f"], stdout=subprocess.PIPE, stderr=FNULL)
+for i in tqdm(range(num_files), ncols=100, desc='Finding files'):
+    line = find.stdout.readline()
+    if len(line.strip()) > 0:
+        files.append(os.path.basename(line))
+    else:
+        break
+
 # get filenames wav directory
-for i in tqdm(range(len(files)), ncols=100, desc='Copying files'):
+for i in tqdm(range(num_files), ncols=100, desc='Copying files'):
     filename = files[i]
     fid = os.path.splitext(filename)[0]
 

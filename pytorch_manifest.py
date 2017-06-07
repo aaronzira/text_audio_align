@@ -37,12 +37,15 @@ if not os.path.exists(dst_txt):
     os.makedirs(dst_txt)
 
 def get_duration(wav_file):
-    f = sf.SoundFile(wav_file)
-    if f.samplerate != 16000:
-        print("sample rate is {}".format(f.samplerate))
+    try:
+        f = sf.SoundFile(wav_file)
+        if f.samplerate != 16000:
+            print("sample rate is {}".format(f.samplerate))
+            return 0
+        else:
+            return float(len(f)/f.samplerate)
+    except:
         return 0
-    else:
-        return float(len(f)/f.samplerate)
 
 def sort_func(element):
     return element[0]

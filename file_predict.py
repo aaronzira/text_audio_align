@@ -3,32 +3,31 @@ import subprocess
 import math
 import os
 import time
-import numpy as np
 from predict_2conv import predict
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model",default="/home/aaron/deepspeech.pytorch/models-merged-1149-5x1024/deepspeech_13.pth.tar")
 parser.add_argument("--file_dir",default="/home/aaron/data/mp3s")
-parser.add_argument("--segment_duration",default=10,type=int)
+parser.add_argument("--segment_duration",default=10,type=int,help="Max segment duration to trim audio file, that will later be further clipped")
+parser.add_argument("--scan_range",default=.25,type=float,help="Percent of segment to scan back for in searching for the next split point")
+parser.add_argument("--minimum_gap",default=.25,type=float,help="Min gap duration (s) between words for splitting segments")
 parser.add_argument("file_id",default=None)
 args = parser.parse_args()
 
 
-def transcribe(file_id,seg_dur):
-    """Transcribe an audio file by splitting it into segments of seg_dur seconds,
-    passing each to the predict function of a trained DeepSpeech model, rescoring 
-    the outputs using a trained KenLM model, and attempting to remove overlapping 
-    words from the output. 
+def transcribe(file_id,seg_dur,scan_frac,min_gap):
+    """Transcribe an audio file by splitting it into segments of seg_dur 
+    seconds, passing each to the predict function of a trained DeepSpeech model, 
+    rescoring the outputs using a trained KenLM model. Segments are trimmed 
+    based on word gaps of min_gap or more seconds, that are searched for within 
+    the last scan_frac fraction of a given segment to find the next split point.
     """ 
 
-    # get the duration of the file 
+    # get file duration
     float_dur = float(subprocess.Popen(["soxi","-D","{}".format(file_id)],
         stdout=subprocess.PIPE).stdout.read().strip())
     duration = int(math.ceil(float_dur))
-
-
-    #start_multiple = seg_dur #- 1
-    predictions = []
+    scan_range = seg_dur * scan_frac
 
     # write wav file if it doesn't exist
     wav_file = "./auds/{}.wav".format(os.path.basename(file_id).split(".")[0])
@@ -37,79 +36,78 @@ def transcribe(file_id,seg_dur):
         subprocess.call(["sox",file_id,"-r","16k",wav_file,"remix","-"])
     
     FNULL = open("/dev/null")
-    #n_segments = int(duration/start_multiple)
     start_time = time.time()
+    predictions = []
+    start,iteration = 0,0
+    finished = False
 
-    #for start in range(0,duration,start_multiple):
-    start,iteration,finished = 0,0,False
     while not finished: 
-        #print("Processing segment {} out of {}...".format(start/start_multiple,n_segments))
         print("Processing segment {}...".format(iteration))
 
         # write segments and generate predictions 
         segment = "./auds/{}.wav".format(start)
-        subprocess.call(["sox",wav_file,segment,"trim",str(start),str(seg_dur)],stdout=FNULL,stderr=FNULL)
+        subprocess.call(["sox",wav_file,segment,"trim",str(start),str(seg_dur)],
+                stdout=FNULL,stderr=FNULL)
         try:
             res = predict(args.model,segment)
         except RuntimeError:
-            #print("Segment {} seems to be empty.".format(start/start_multiple))
             print("Segment {} seems to be empty.".format(iteration))
             start += seg_dur
             if start > duration:
                 finished = True
         #for time comparisons: res = [(word["word"],word["start"]) for word in res]
 
-        # look for the largest gap between words that occurs in the second half of the capture
-        # as determined by numer of words, and use that as the starting time for the next segment
+        # cycle through this segment's word gaps in reverse order until passing
+        # scan_range, choosing the next segment's start time as either the 
+        # first gap of at least min_gap seconds in length, or the end of the 
+        # segment if none are found
         else:
             # add in offset
             for catch in res:
                 catch["start"] += start
-
-            if start+seg_dur > duration:
+            # last segment
+            if start + seg_dur > duration:
                 predictions.extend(res)
                 finished = True
             else:    
-                halfway = len(res)/2
-                first,second = res[:halfway],res[halfway:]
+                scan_boundary = (start + seg_dur) - scan_range
+                
+                # start time of next word used to calculate gap
+                next_word_start = start + seg_dur
 
-                starts = [word["start"] for word in second]
-                starts.append(seg_dur+start)
-                ends = [word["start"]+word["duration"] for word in second]
-                gaps = [s-e for s,e in zip(starts[1:],ends)]
-                print([round(gap,2) for gap in gaps])
-                split_point = np.argmax(gaps)
-                predictions.extend(first)
-                predictions.extend(second[:split_point+1])
+                for i,word in enumerate(res[::-1]):
+                    # end time of current word used to calculate gap
+                    this_word_end = word["start"] + word["duration"]
+                    
+                    # went past the scan range and found no good splits, 
+                    # so just use the whole segment
+                    if this_word_end < scan_boundary:
+                        predictions.extend(res)
+                        start += seg_dur
+                        break
 
-                start += ends[split_point]
+                    # found a good split
+                    if next_word_start - this_word_end >= min_gap:
+                        if i == 0:
+                            predictions.extend(res)
+                        else:
+                            predictions.extend(res[:-i])
+                        start = this_word_end
+                        break
+                    
+                    # no good split yet, so continue looping
+                    next_word_start = word["start"]
+                
         os.remove(segment)
         iteration += 1
         
         #res = [word["word"] if word["conf"] > .92 else "____" for word in res]
         #predictions.append(" ".join(res))
         #print([(word["word"],word["start"]) for word in predictions])
-        """
-        # only retain the words that start outside some buffer before the end of the string 
-        res = [result for result in res if result["start"] <= start_multiple+.2]
-        if res:
-            # start of the string buffer depends on the last word in the previous catch
-            last_word_end.append(res[-1]["start"]+res[-1]["duration"]-start_multiple)
-            res = [(result["word"],result["conf"]) for result in res if result["start"] >= last_word_end[-2]-.15]
-            # drop first words if they are the same as the last one 
-            for i in range(4):
-                if start > 0 and res[i] == predictions[-1][-1]:
-                    res = res[i+1:]
-            predictions.append(res)
-        """
-    end_time = time.time()
-    print("{} segments processed in {} seconds.".format(iteration,int(end_time-start_time)))
 
-    #print("{} segments processed in {} seconds.".format(n_segments+1,int(end_time-start_time)))
-    #transcript = " ".join([" ".join(seg) for seg in predictions])
-    #with open("./auds/transcript.txt","w") as f:
-    #    f.write(transcript)
-    #return transcript
+    end_time = time.time()
+    print("{} segments processed in {} seconds.".format(
+        iteration,int(end_time-start_time)))
 
     #return [" ".join(word["word"] for word in predictions)]
     # take care of rounding here after proper format is decided
@@ -118,12 +116,14 @@ def transcribe(file_id,seg_dur):
 if __name__ == "__main__":
     path = args.file_dir
     segment_duration = args.segment_duration
+    scan_range = args.scan_range
+    min_gap = args.minimum_gap
     filename = os.path.join(path,args.file_id)
     outfile = "./auds/{}.ctm".format(os.path.basename(filename).split(".")[0]) 
     #for time comparisons: outfile = "./auds/{}_times.txt".format(os.path.basename(filename).split(".")[0])
 
     print(filename)
-    print(transcribe(filename,segment_duration))
+    print(transcribe(filename,segment_duration,scan_range,min_gap))
 
     # not sure exactly what format to write (as actual json?) so this is temporary
     #ctms = transcribe(filename,segment_duration)

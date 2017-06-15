@@ -54,8 +54,10 @@ def get_duration(audio_file):
 
     return duration
 
-def save_capture(capture_list,start,end,strings):
+def save_capture(capture_list,start,end,strings,min_dur):
     """Save the current successfully captured words and times to capture_list"""
+
+    if len(strings) < 2 or end-start < min_dur: return
 
     capture = {"start":start,"end":end,"string":" ".join(strings),
                 "duration":round(end-start,2)}
@@ -218,12 +220,12 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
                     # large gap between last capture and this one
                     # likely that something was missing in the transcript
                     if catch["start"]-end_time > .5:
-                        save_capture(captures,start_time,end_time,current)
+                        save_capture(captures,start_time,end_time,current,min_dur)
                         current = []
 
                     # adding this word would equal or exceed max_length
                     elif catch["end"]-start_time >= max_length:
-                        save_capture(captures,start_time,end_time,current)
+                        save_capture(captures,start_time,end_time,current,min_dur)
                         current = []
                         if randomize:
                             max_length = random.randint(max_dur[0],max_dur[1])
@@ -235,24 +237,16 @@ def data_generator(file_id,min_dur=2,max_dur=(5,20),randomize=False):
 
             # a miss after prior success(es)
             elif current:
-                save_capture(captures,start_time,end_time,current)
+                save_capture(captures,start_time,end_time,current,min_dur)
                 current = []
 
         # last word was a success but current capture hasn't been saved yet
         if current:
-            save_capture(captures,start_time,end_time,current)
+            save_capture(captures,start_time,end_time,current,min_dur)
 
         # write strings and split audio into consituent segments
         logger.info("Writing text and audio segments from paragraph {}...".format(i))
         for result in captures:
-            # don't write short files
-            if result["duration"] < min_dur:
-                logger.info("Skipping capture from paragraph {} (too short)...".format(i))
-                continue
-            if len(result["string"].split()) < 2:
-                logger.info("Skipping capture from paragraph {} (too few words)...".format(i))
-                continue
-
             txt_segment = os.path.join(text_out_dir,"{}_{}_{}.txt".format(
                         file_id,
                         "{:07d}".format(int((times[i]+result["start"])*100)),

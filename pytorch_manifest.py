@@ -43,7 +43,7 @@ def get_duration(wav_file):
             print("sample rate is {}".format(f.samplerate))
             return 0
         else:
-            return float(len(f)/f.samplerate)
+            return len(f)/float(f.samplerate)
     except:
         return 0
 

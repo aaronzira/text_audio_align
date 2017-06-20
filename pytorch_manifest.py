@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 parser = argparse.ArgumentParser()
 parser.add_argument("--data_dir",default="/home/aaron/data/deepspeech_data",type=str,help='Directory to read files from')
 parser.add_argument("--dst_dir",default=".",type=str, help="Directory to store dataset to")
-parser.add_argument("--min_seconds",default=1.0,type=float, help="Cutoff for minimum duration")
+parser.add_argument("--min_seconds",default=2.0,type=float, help="Cutoff for minimum duration")
 parser.add_argument("--max_seconds",default=20.0,type=float, help="Cutoff for maximum duration")
 parser.add_argument("--no_ted", help="Merge with TED dataset", action='store_true', default=False)
 parser.add_argument("--dry_run", help="Don't write manifest csv's", action='store_true', default=False)
@@ -75,9 +75,14 @@ for i in tqdm(range(num_files), ncols=100, desc='Copying files'):
 
     if not os.path.isfile(dst_wav_file):
         duration = get_duration(wav_file)
-        shutil.copy2(wav_file, dst_wav_file)
+
+        if duration >= 2.0:
+            shutil.copy2(wav_file, dst_wav_file)
     else:
         duration = get_duration(dst_wav_file)
+
+        if duration < 2.0:
+            os.remove(dst_wav_file)
 
     if duration < args.min_seconds or duration > args.max_seconds:
         continue
@@ -111,8 +116,9 @@ for i in tqdm(range(num_files), ncols=100, desc='Copying files'):
 
 val_len = int(len(keep_files) * args.split_ratio)
 
-train_set = keep_files[:-val_len]
-val_set = keep_files[-val_len:]
+train_set = keep_files[:-val_len*2]
+val_set = keep_files[len(train_set):-val_len]
+test_set = keep_files[-val_len:]
 
 if not args.no_ted and not args.dry_run:
     ted_train = []
@@ -135,6 +141,7 @@ if not args.no_ted and not args.dry_run:
 
 train_set.sort(key=sort_func)
 val_set.sort(key=sort_func)
+test_set.sort(key=sort_func)
 
 total_train = sum([line[0] for line in train_set])
 if not args.dry_run:
@@ -148,15 +155,21 @@ if not args.dry_run:
         for line in val_set:
             f.write((line[1].strip() + "\n").encode('utf-8'))
 
+total_test = sum([line[0] for line in test_set])
+if not args.dry_run:
+    with open('test.csv', 'w') as f:
+        for line in test_set:
+            f.write((line[1].strip() + "\n").encode('utf-8'))
+
 if not args.dry_run:
     # train_set has already been written so modifying in place is ok
     np.random.shuffle(train_set)
-    train_subset = train_set[:len(val_set)]
+    train_subset = train_set[:len(val_set)/2]
     with open('train_subset.csv', 'w') as f:
         for line in train_subset:
             f.write((line[1].strip() + "\n").encode("utf-8"))
 
-total = total_train + total_val
+total = total_train + total_val + total_test
 
 durations = [t[0] for t in train_set]
 bins = np.arange(int(args.min_seconds), int(args.max_seconds) + 1)
@@ -168,4 +181,4 @@ plt.xticks(bins)
 plt.title("Durations distribution @ {} hours".format(int(total/3600)))
 plt.savefig('durations.png')
 
-print("Total {:.2f} hours, train {:.2f} hours, val {:.2f} hours, ratio {:.2f}".format(total/3600, total_train/3600, total_val/3600, total_val/total_train))
+print("Total {:.2f} hours, train {:.2f} hours, val {:.2f} hours, test {:.2f}, ratio {:.5f}/{:.5f}/{:.5f}".format(total/3600, total_train/3600, total_val/3600, total_test/3600, total_train/total, total_val/total, total_test/total))

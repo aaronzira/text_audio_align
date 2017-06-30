@@ -55,32 +55,33 @@ def data_generator(file_path,shuffle,vocabulary_size,train_size,test_size):
     for idx,txt_file in enumerate(os.listdir(file_path)):
         doc_sents = []
         with open(os.path.join(file_path,txt_file),"r") as f:
-            for sentence in nltk.sent_tokenize(f.read()):
+            for paragraph in f.readlines():
+                for sentence in nltk.sent_tokenize(paragraph):
 
-                # get rid of sentences with blanks
-                if "_" in sentence:
-                    continue
+                    # get rid of sentences with blanks
+                    if "_" in sentence:
+                        continue
 
-                sentence = re_decimal.sub("\\1 point \\2", sentence) # decimals
-                sentence = re_url.sub(" dot \\1", sentence) # URLs
-                sentence = re_negative.sub(" minus \\1", sentence) # negative numbers
-                sentence = re_pattern.sub(" ", sentence).lower() # space in case it was connected to a word
-                sentence = re_and.sub(" and ", sentence)
-                sentence = re_at.sub(" at ", sentence)
-                sentence = re_percent.sub(" percent ", sentence)
-                sentence = re_plus.sub(" plus ", sentence)
-                sentence = re_equals.sub(" equals ", sentence)
-                sentence = re_exponent.sub(" to the ", sentence)
-                sentence = re_degrees.sub(" degrees ", sentence)
-                sentence = re_currencies.sub("\\1 dollars ", sentence)
-                numbers = re.findall("\d+",sentence)
-                for num in numbers:
-                    sentence = sentence.replace(num, " {} ".format(num_to_text(num)), 1)
-                sentence = unidecode(sentence)
-                sentence = re_alnum.sub("",sentence)
-                sentence = re_tens.sub("\\1ties ", sentence)
+                    sentence = re_decimal.sub("\\1 point \\2", sentence) # decimals
+                    sentence = re_url.sub(" dot \\1", sentence) # URLs
+                    sentence = re_negative.sub(" minus \\1", sentence) # negative numbers
+                    sentence = re_pattern.sub(" ", sentence).lower() # space in case it was connected to a word
+                    sentence = re_and.sub(" and ", sentence)
+                    sentence = re_at.sub(" at ", sentence)
+                    sentence = re_percent.sub(" percent ", sentence)
+                    sentence = re_plus.sub(" plus ", sentence)
+                    sentence = re_equals.sub(" equals ", sentence)
+                    sentence = re_exponent.sub(" to the ", sentence)
+                    sentence = re_degrees.sub(" degrees ", sentence)
+                    sentence = re_currencies.sub("\\1 dollars ", sentence)
+                    numbers = re.findall("\d+",sentence)
+                    for num in numbers:
+                        sentence = sentence.replace(num, " {} ".format(num_to_text(num)), 1)
+                    sentence = unidecode(sentence)
+                    sentence = re_alnum.sub("",sentence)
+                    sentence = re_tens.sub("\\1ties ", sentence)
 
-                doc_sents.append(sentence)
+                    doc_sents.append(sentence)
 
         sentences.extend([sent.split() for sent in doc_sents])
 

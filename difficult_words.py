@@ -98,7 +98,7 @@ for index, ctm in enumerate(ctms):
             if i+1 >= len(captures):
                 break;
 
-            if captures[i+1]['start'] - c['end'] > 0.75:
+            if captures[i+1]['start'] - c['end'] > 2:
                 captures = []
                 break;
 

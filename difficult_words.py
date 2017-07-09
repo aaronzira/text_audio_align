@@ -91,6 +91,20 @@ for index, ctm in enumerate(ctms):
             continue;
 
         captures = ctms[start_index:end_index+1]
+        
+        # if the gap between the words is too long in the captured segment then we should skip it
+        # since it might be fillers or background conversation
+        for i, c in enumerate(captures):
+            if i+1 >= len(captures):
+                break;
+
+            if captures[i+1]['start'] - c['end'] > 0.75:
+                captures = []
+                break;
+
+        # discard too short segments
+        if len(captures) < 5:
+            continue;
 
         words = ' '.join([c['word'] for c in captures])
         print("mistmatch captured at index {}, start_index {}, end_index {}, {}".format(index, start_index, end_index, words))

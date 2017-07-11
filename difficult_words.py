@@ -43,6 +43,7 @@ with open(ctm_file) as f:
     # could eventually put it in a single loop, like
     #for word in json.loads(f.read()):
 
+total_seconds = 0
 last_capture_end = 0
 for index, ctm in enumerate(ctms):
     if ctm['case'] == 'mismatch':
@@ -112,7 +113,11 @@ for index, ctm in enumerate(ctms):
         clip_start = captures[0]['start']
         clip_end = captures[-1]['end']
 
+        total_seconds += clip_end - clip_start
+
         trim(args.file_id,audio_file, clip_start, clip_end, 0)
         save_txt(args.file_id, words, clip_start, clip_end, 0)
 
         last_capture_end = clip_end
+
+print("\nratio {:.2f}".format(total_seconds/(ctms[-1]['end'] - ctms[0]['start'])))

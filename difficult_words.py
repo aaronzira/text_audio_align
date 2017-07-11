@@ -2,17 +2,18 @@ import argparse
 import json
 import os
 import subprocess
+import re
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--file_id",help="filename without .json or .mp3 extension")
-parser.add_argument("--min_gap",default=0.5,type=float,help="minimum gap between words to use for splitting")
+parser.add_argument("--min_gap",default=0.25,type=float,help="minimum gap between words to use for splitting")
 parser.add_argument("--debug",action="store_true")
 args = parser.parse_args()
 
 
 # temporarily running them from "others/"
-ctm_file = "".join(("others/",args.file_id,"_align.json"))
-audio_file = ".".join(("others/"+args.file_id,"mp3"))
+ctm_file = "".join(("./",args.file_id,"_align.json"))
+audio_file = ".".join(("./"+args.file_id,"mp3"))
 
 # leaving offset here in case the algo changes to require it
 def trim(base_filename,audio_file,start,end,offset):
@@ -34,52 +35,48 @@ def trim(base_filename,audio_file,start,end,offset):
     return segment
 
 with open(ctm_file) as f:
-    ctm = json.loads(f.read())
-    # could eventually put it in a single loop, like
-    #for word in json.loads(f.read()):
+    ctms = json.loads(f.read())
 
     null_word = {'case':None, 'conf':None, 'duration':0, 'end':0, 'orig':None, 'pred':None, 'start':0, 'word':None}
-    gaps = [second['start']-first['end'] for first,second in zip([null_word]+ctm,ctm)]
+    gaps = [second['start']-first['end'] for first,second in zip([null_word]+ctms,ctms)]
 
-    last = 0
-    #last_gap = 0
+    # we split from one good gap to the next
+    # a good gap is when the silence between the words is long
+    # and the word *itself* is long and is not a mismatch
+    good_gaps = [(i, gap) for i, gap in enumerate(gaps) if gap > args.min_gap and ctms[i]['duration'] > args.min_gap and ctms[i]['case'] != 'mismatch']
+
     total_written = 0
-    for i,gap in enumerate(gaps):
-        if gap > args.min_gap:
+    for i, g in enumerate(good_gaps):
+        ctm_index = g[0]
+        gap = g[1]
 
-            #print("longer than .5: ", gap)
-            #print(i)
-            #print(" ".join([word['word'] for word in ctm[last:i]]))
+        # to prevent out of bounds
+        if i+1 >= len(good_gaps):
+            continue
 
-            n_words = i-last
-            n_mismatches = sum([word['case'] == 'mismatch' for word in ctm[last:i]])
+        # we start splitting from this ctm_index to the next good gap
+        start_index = ctm_index
+        end_index = good_gaps[i+1][0]
 
-            if n_words > 3 and n_mismatches > 2:
-                #print("passed check. writing from {} to {}".format(ctm[last]['start'],ctm[i]['start']))
-                #and gaps[i+1] > .2 \
-                ## could potentially be out of index
+        # this is our clip
+        clip = ctms[start_index:end_index]
 
-                #and ctm[last-1]['case']=='success' \
-                #and ctm[last]['case']=='success' \
-                #and ctm[i-1]['case']=='success' \
-                #and ctm[i]['case']=='success':
+        n_words = len(clip)
+        n_mismatches = sum([word['case'] == 'mismatch' for word in clip])
+        words = " ".join([word["word"] for word in clip])
 
-                #print("\t".join([word['word'] for word in ctm[last:i]]))
-                #print("\t".join(["X" if word['case'] == "mismatch" else "O" for word in ctm[last:i]]))
+        if n_words >= 5 and n_mismatches >= 1:
+            clip_start = clip[0]['start']
+            clip_end = clip[-1]['end']
 
-                clip_start = ctm[last]['start'] #-(last_gap/10.) ##ctm[last-1]['end'] #+(last_gap/10.)
-                clip_end = ctm[i]['start'] #-(gap/10.) ##ctm[i-1]['end'] #+gap/2.
-                wav_name = trim(args.file_id,audio_file,clip_start,clip_end,0)
+            wav_name = trim(args.file_id, audio_file, clip_start, clip_end, 0)
 
-                # fine for now, but what if a file had a "." in the name
-                with open(".".join([wav_name.split(".")[0],"txt"]),"w") as f:
-                    f.write(" ".join([word["word"] for word in ctm[last:i]]))
-                    if args.debug:
-                        f.write("\n{} {} {}".format(ctm[last]['start'],ctm[i]['start'],gap))
-                total_written += clip_end-clip_start
+            # text file is .wav repalced with .txt
+            txt_name = re.sub(".wav$", ".txt", wav_name)
 
-            #last_gap = ctm[i]['start']-ctm[i-1]['end']
-            last = i
-            #print(ctm[i]['case'],ctm[i+1]['case'])
+            with open(txt_name,"w") as f:
+                f.write(words + "\n")
 
-print("Wrote {} seconds out of {} ({:.2f}%).".format(total_written,ctm[-1]['end'],(total_written/ctm[-1]['end'])*100))
+            total_written += clip_end - clip_start
+
+print("Wrote {} seconds out of {} ({:.2f}%).".format(total_written,ctms[-1]['end'],(total_written/ctms[-1]['end'])*100))

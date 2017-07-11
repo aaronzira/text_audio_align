@@ -1,123 +1,82 @@
-import sys
 import argparse
 import json
 import os
 import subprocess
+import re
 
 parser = argparse.ArgumentParser()
-parser.add_argument('file_id', type=str, help='file id to process')
-parser.add_argument('--window-len', type=str, dest='window_len', help='number of words to look around the mismatch', default=5)
+parser.add_argument("--file_id",help="filename without .json or .mp3 extension")
+parser.add_argument("--min_gap",default=0.25,type=float,help="minimum gap between words to use for splitting")
+parser.add_argument("--debug",action="store_true")
 args = parser.parse_args()
 
-ctm_file = "".join((args.file_id,"_align.json"))
-audio_file = ".".join((args.file_id,"mp3"))
+
+# temporarily running them from "others/"
+ctm_file = "".join(("./",args.file_id,"_align.json"))
+audio_file = ".".join(("./"+args.file_id,"mp3"))
 
 # leaving offset here in case the algo changes to require it
 def trim(base_filename,audio_file,start,end,offset):
     """Write out a segment of an audio file to wav, based on start, end,
     and offset times in seconds.
     """
-
-    segment = os.path.join(".","{}_{}_{}.wav".format(
+    FNULL = open("/dev/null")
+    # still os.path.join for adding out dir later
+    segment = os.path.join("{}_{}_{}.wav".format(
                                     base_filename,
                                    "{:07d}".format(int((offset+start)*100)),
                                    "{:07d}".format(int((offset+end)*100))))
     duration = end-start
-    FNULL = open(os.devnull, 'w')
     subprocess.call(["sox","{}".format(audio_file),"-r","16k",
                 "{}".format(segment),"trim","{}".format(start),
-                "{}".format(duration),"remix","-"], stdout=FNULL, stderr=FNULL)
+                "{}".format(duration),"remix","-"],
+                stdout=FNULL,stderr=FNULL)
 
-    return
-
-def save_txt(base_filename,txt,start,end,offset):
-    txt_file = os.path.join(".","{}_{}_{}.txt".format(
-                                    base_filename,
-                                   "{:07d}".format(int((offset+start)*100)),
-                                   "{:07d}".format(int((offset+end)*100))))
-    with open(txt_file, 'w') as f:
-        f.write(txt + "\n")
+    return segment
 
 with open(ctm_file) as f:
     ctms = json.loads(f.read())
-    # could eventually put it in a single loop, like
-    #for word in json.loads(f.read()):
 
-total_seconds = 0
-last_capture_end = 0
-for index, ctm in enumerate(ctms):
-    if ctm['case'] == 'mismatch':
-        start_index = None
-        end_index = None
-        captures = []
+    null_word = {'case':None, 'conf':None, 'duration':0, 'end':0, 'orig':None, 'pred':None, 'start':0, 'word':None}
+    gaps = [second['start']-first['end'] for first,second in zip([null_word]+ctms,ctms)]
 
-        # we don't want overlaps between the segments
-        if ctm['start'] < last_capture_end:
+    # we split from one good gap to the next
+    # a good gap is when the silence between the words is long
+    # and the word *itself* is long and is not a mismatch
+    good_gaps = [(i, gap) for i, gap in enumerate(gaps) if gap > args.min_gap and ctms[i]['duration'] > args.min_gap and ctms[i]['case'] != 'mismatch']
+
+    total_written = 0
+    for i, g in enumerate(good_gaps):
+        ctm_index = g[0]
+        gap = g[1]
+
+        # to prevent out of bounds
+        if i+1 >= len(good_gaps):
             continue
 
-        if index - args.window_len < 0:
-            # most probably this is mismatch is at the start
-            continue
+        # we start splitting from this ctm_index to the next good gap
+        start_index = ctm_index
+        end_index = good_gaps[i+1][0]
 
-        if index + args.window_len > len(ctms):
-            # most probably this is mismatch is towards the end
-            continue
+        # this is our clip
+        clip = ctms[start_index:end_index]
 
-        # find the previous word which is a success with a decent gap
-        for i in range(index - args.window_len, 0, -1):
-            p = i - 1
-            if p < 0:
-                break;
+        n_words = len(clip)
+        n_mismatches = sum([word['case'] == 'mismatch' for word in clip])
+        words = " ".join([word["word"] for word in clip])
 
-            gap = ctms[i]['start'] - ctms[p]['end']
-            if ctms[i]['case'] == 'success' and ctms[p]['case'] == 'success' and gap > 0.25 and ctms[p]['end'] > last_capture_end:
-                start_index = i
-                break;
+        if n_words >= 5 and n_mismatches >= 1:
+            clip_start = clip[0]['start']
+            clip_end = clip[-1]['end']
 
-        if not start_index:
-            continue;
+            wav_name = trim(args.file_id, audio_file, clip_start, clip_end, 0)
 
-        # find the next word which is a success with a decent gap
-        for i in range(index + args.window_len, len(ctms)):
-            n = i + 1
-            if n >= len(ctms):
-                break;
+            # text file is .wav repalced with .txt
+            txt_name = re.sub(".wav$", ".txt", wav_name)
 
-            gap = ctms[n]['start'] - ctms[i]['end']
-            if ctms[i]['case'] == 'success' and ctms[n]['case'] == 'success' and gap > 0.25:
-                end_index = i
-                break;
+            with open(txt_name,"w") as f:
+                f.write(words + "\n")
 
-        if not end_index:
-            continue;
+            total_written += clip_end - clip_start
 
-        captures = ctms[start_index:end_index+1]
-        
-        # if the gap between the words is too long in the captured segment then we should skip it
-        # since it might be fillers or background conversation
-        for i, c in enumerate(captures):
-            if i+1 >= len(captures):
-                break;
-
-            if captures[i+1]['start'] - c['end'] > 2:
-                captures = []
-                break;
-
-        # discard too short segments
-        if len(captures) < 5:
-            continue;
-
-        words = ' '.join([c['word'] for c in captures])
-        print("mistmatch captured at index {}, start_index {}, end_index {}, {}".format(index, start_index, end_index, words))
-
-        clip_start = captures[0]['start']
-        clip_end = captures[-1]['end']
-
-        total_seconds += clip_end - clip_start
-
-        trim(args.file_id,audio_file, clip_start, clip_end, 0)
-        save_txt(args.file_id, words, clip_start, clip_end, 0)
-
-        last_capture_end = clip_end
-
-print("\nratio {:.2f}".format(total_seconds/(ctms[-1]['end'] - ctms[0]['start'])))
+print("Wrote {} seconds out of {} ({:.2f}%).".format(total_written,ctms[-1]['end'],(total_written/ctms[-1]['end'])*100))

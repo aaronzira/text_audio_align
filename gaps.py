@@ -5,6 +5,8 @@ import subprocess
 import re
 from tqdm import tqdm
 import logging
+import boto3
+import sys
 
 parser = argparse.ArgumentParser()
 parser.add_argument('file_id', type=str, help='file id to process')
@@ -20,15 +22,27 @@ logger = logging.getLogger("info_logger")
 
 # temporarily running them from "others/"
 ctm_file = os.path.join(args.align_dir, args.file_id + "_align.json")
-audio_file = os.path.join(args.audio_dir, args.file_id + ".mp3")
+mp3 = os.path.join(args.audio_dir, args.file_id + ".mp3")
+wav = os.path.join(args.audio_dir, args.file_id + ".wav")
+FNULL = open("/dev/null")
+
+if not os.path.isfile(wav):
+    if not os.path.isfile(mp3):
+        bucket = boto3.resource("s3").Bucket("cgws")
+        try:
+            bucket.download_file("{}.mp3".format(args.file_id), mp3)
+        except:
+            print("Could not download file {} from S3.".format(args.file_id))
+            sys.exit()
+
+    subprocess.call(["sox","{}".format(mp3),"-r","16k", "{}".format(wav), "remix","-"], stdout=FNULL, stderr=FNULL)
 
 # leaving offset here in case the algo changes to require it
 def sox_trim(start, end):
     """Write out a segment of an audio file to wav, based on start, end,
     """
-    FNULL = open("/dev/null")
-    wav_file = os.path.join(args.dataset_dir, "wav/{}_{:07d}_{:07d}.wav".format(args.file_id, int(start*100), int(end*100))) 
-    subprocess.call(["sox", audio_file, "-r", "16k", wav_file, "trim", str(start), str(end - start), "remix", "-"], stdout=FNULL, stderr=FNULL)
+    clip_file = os.path.join(args.dataset_dir, "wav/{}_{:07d}_{:07d}.wav".format(args.file_id, int(start*100), int(end*100))) 
+    subprocess.call(["sox", wav, clip_file, "trim", str(start), str(end - start)], stdout=FNULL, stderr=FNULL)
 
 with open(ctm_file) as f:
     ctms = json.loads(f.read())

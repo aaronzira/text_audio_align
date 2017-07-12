@@ -73,7 +73,7 @@ with open(ctm_file) as f:
 
         n_words = len(clip)
         n_mismatches = sum([word['case'] == 'mismatch' for word in clip])
-        words = " ".join([word["word"] for word in clip])
+        words = " ".join([word["word"] for word in clip]).encode('utf-8').strip()
 
         if n_words >= 5 and n_mismatches >= 1:
             start_sec = clip[0]['start']

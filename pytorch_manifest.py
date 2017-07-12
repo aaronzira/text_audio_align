@@ -91,10 +91,6 @@ for i in tqdm(range(num_files), ncols=100, desc='Copying files'):
     if duration < args.min_seconds or duration > args.max_seconds:
         continue
 
-    total_seconds += duration
-    if args.max_hours != 0 and args.max_hours < total_seconds/3600:
-        break
-
     txt_file = os.path.join(txt_dir,"{}.txt".format(fid))
     dst_txt_file = os.path.join(dst_txt, "{}.txt".format(fid))
     if not os.path.isfile(dst_txt_file):
@@ -119,6 +115,11 @@ for i in tqdm(range(num_files), ncols=100, desc='Copying files'):
             f.write(transcript.upper() + "\n")
 
     keep_files.append((duration, "{},{}".format(dst_wav_file,dst_txt_file)))
+
+    total_seconds += duration
+    if args.max_hours != 0 and args.max_hours < total_seconds/3600:
+        print("\n")
+        break
 
 val_len = int(len(keep_files) * args.split_ratio)
 

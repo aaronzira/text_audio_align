@@ -14,25 +14,27 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--data_dir",default="/home/aaron/data/deepspeech_data",type=str,help='Directory to read files from')
-parser.add_argument("--dst_dir",default=".",type=str, help="Directory to store dataset to")
-parser.add_argument("--min_seconds",default=2.0,type=float, help="Cutoff for minimum duration")
-parser.add_argument("--max_seconds",default=20.0,type=float, help="Cutoff for maximum duration")
-parser.add_argument("--no_ted", help="Merge with TED dataset", action='store_true', default=False)
-parser.add_argument("--dry_run", help="Don't write manifest csv's", action='store_true', default=False)
-parser.add_argument("--split_ratio", help="Percent of files to keep in val set", type=float, default=0.01)
+parser.add_argument("--data-dir", dest="data_dir", type=str, default="/home/aaron/data/phoenix-data", help='Directory to read files from')
+parser.add_argument("--dst-dir", dest="dst_dir", default=".", type=str, help="Directory to store dataset to")
+parser.add_argument("--min-seconds", dest="min_seconds", default=2.0, type=float, help="Cutoff for minimum duration")
+parser.add_argument("--max-seconds", dest="max_seconds", default=20.0, type=float, help="Cutoff for maximum duration")
+parser.add_argument("--max-hours", dest="max_hours", default=0, type=int, help="Size of the dataset in hours")
+parser.add_argument("--merge-ted", dest="merge_ted", help="Merge with TED dataset", action='store_true', default=False)
+parser.add_argument("--dry-run", dest="dry_run", help="Don't write manifest csv's", action='store_true', default=False)
+parser.add_argument("--split-ratio", dest="split_ratio", type=float, default=0.01, help="Percent of files to keep in val & test set")
+parser.add_argument("--txt-dir", dest="txt_dir", type=str, default="txt", help="Directory name for txt files")
 args = parser.parse_args()
 
 parent_dir = os.path.abspath(args.data_dir)
 wav_dir = os.path.join(parent_dir,"wav")
-txt_dir = os.path.join(parent_dir,"stm")
+txt_dir = os.path.join(parent_dir, args.txt_dir)
 
 dst_dir = os.path.abspath(args.dst_dir)
 dst_wav = os.path.join(dst_dir, "wav")
 if not os.path.exists(dst_wav):
     os.makedirs(dst_wav)
 
-dst_txt = os.path.join(dst_dir, "stm")
+dst_txt = os.path.join(dst_dir, args.txt_dir)
 if not os.path.exists(dst_txt):
     os.makedirs(dst_txt)
 
@@ -65,6 +67,8 @@ for i in tqdm(range(num_files), ncols=100, desc='Finding files'):
     else:
         break
 
+total_seconds = 0
+
 # get filenames wav directory
 for i in tqdm(range(num_files), ncols=100, desc='Copying files'):
     filename = files[i]
@@ -87,6 +91,10 @@ for i in tqdm(range(num_files), ncols=100, desc='Copying files'):
     if duration < args.min_seconds or duration > args.max_seconds:
         continue
 
+    total_seconds += duration
+    if args.max_hours != 0 and args.max_hours < total_seconds/3600:
+        break
+
     txt_file = os.path.join(txt_dir,"{}.txt".format(fid))
     dst_txt_file = os.path.join(dst_txt, "{}.txt".format(fid))
     if not os.path.isfile(dst_txt_file):
@@ -101,12 +109,10 @@ for i in tqdm(range(num_files), ncols=100, desc='Copying files'):
         # at least two words in transcript
         num_words = len(transcript.split())
         if num_words <= 1:
-            print("skipping %s as num word is %d" % (fid, num_words))
             continue 
 
         oov = re.search("[^a-zA-Z ']", transcript)
         if oov is not None:
-            print("skipping %s due to oov, %s" % (fid, transcript))
             continue 
 
         with open(dst_txt_file, 'w') as f:
@@ -120,7 +126,7 @@ train_set = keep_files[:-val_len*2]
 val_set = keep_files[len(train_set):-val_len]
 test_set = keep_files[-val_len:]
 
-if not args.no_ted and not args.dry_run:
+if args.merge_ted and not args.dry_run:
     ted_train = []
     for line in open("ted_train_manifest.csv","r"):
         ted_train.append(line)

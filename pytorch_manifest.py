@@ -23,6 +23,8 @@ parser.add_argument("--merge-ted", dest="merge_ted", help="Merge with TED datase
 parser.add_argument("--dry-run", dest="dry_run", help="Don't write manifest csv's", action='store_true', default=False)
 parser.add_argument("--split-ratio", dest="split_ratio", type=float, default=0.01, help="Percent of files to keep in val & test set")
 parser.add_argument("--txt-dir", dest="txt_dir", type=str, default="txt", help="Directory name for txt files")
+parser.add_argument("--prefix", dest="prefix", type=str, default="unnamed", help="Prefix for manifest files")
+parser.add_argument("--manifest-dir", dest="manifest_dir", type=str, default=".", help="Directory for manifest files")
 args = parser.parse_args()
 
 parent_dir = os.path.abspath(args.data_dir)
@@ -67,7 +69,7 @@ for i in tqdm(range(num_files), ncols=100, desc='Finding files'):
     else:
         break
 
-total_seconds = 0
+total_hours = 0
 
 # get filenames wav directory
 for i in tqdm(range(num_files), ncols=100, desc='Copying files'):
@@ -116,8 +118,8 @@ for i in tqdm(range(num_files), ncols=100, desc='Copying files'):
 
     keep_files.append((duration, "{},{}".format(dst_wav_file,dst_txt_file)))
 
-    total_seconds += duration
-    if args.max_hours != 0 and args.max_hours < total_seconds/3600:
+    total_hours += duration/3600
+    if args.max_hours != 0 and args.max_hours <= total_hours:
         print("\n")
         break
 
@@ -152,19 +154,19 @@ test_set.sort(key=sort_func)
 
 total_train = sum([line[0] for line in train_set])
 if not args.dry_run:
-    with open('train.csv', 'w') as f:
+    with open(os.path.join(args.manifest_dir, "{}-train-{}.csv".format(args.prefix, int(total_hours))), 'w') as f:
         for line in train_set:
             f.write((line[1].strip() + "\n").encode('utf-8'))
 
 total_val = sum([line[0] for line in val_set])
 if not args.dry_run:
-    with open('val.csv', 'w') as f:
+    with open(os.path.join(args.manifest_dir, "{}-val-{}.csv".format(args.prefix, int(total_hours))), 'w') as f:
         for line in val_set:
             f.write((line[1].strip() + "\n").encode('utf-8'))
 
 total_test = sum([line[0] for line in test_set])
 if not args.dry_run:
-    with open('test.csv', 'w') as f:
+    with open(os.path.join(args.manifest_dir, "{}-test-{}.csv".format(args.prefix, int(total_hours))), 'w') as f:
         for line in test_set:
             f.write((line[1].strip() + "\n").encode('utf-8'))
 
@@ -172,7 +174,7 @@ if not args.dry_run:
     # train_set has already been written so modifying in place is ok
     np.random.shuffle(train_set)
     train_subset = train_set[:len(val_set)/2]
-    with open('train_subset.csv', 'w') as f:
+    with open(os.path.join(args.manifest_dir, "{}-train-subset-{}.csv".format(args.prefix, int(total_hours))), 'w') as f:
         for line in train_subset:
             f.write((line[1].strip() + "\n").encode("utf-8"))
 
@@ -185,7 +187,7 @@ plt.xlabel('Seconds')
 plt.ylabel('# of files')
 plt.grid(color='gray', linestyle='dotted')
 plt.xticks(bins)
-plt.title("Durations distribution @ {} hours".format(int(total/3600)))
+plt.title("Durations distribution for {} {} hours".format(args.prefix, int(total_hours)))
 plt.savefig('durations.png')
 
 print("Total {:.2f} hours, train {:.2f} hours, val {:.2f} hours, test {:.2f}, ratio {:.5f}/{:.5f}/{:.5f}".format(total/3600, total_train/3600, total_val/3600, total_test/3600, total_train/total, total_val/total, total_test/total))

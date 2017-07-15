@@ -26,6 +26,9 @@ mp3 = os.path.join(args.audio_dir, args.file_id + ".mp3")
 wav = os.path.join(args.audio_dir, args.file_id + ".wav")
 FNULL = open("/dev/null")
 
+if not os.path.isfile(ctm_file):
+    sys.exit()
+
 if not os.path.isfile(wav):
     if not os.path.isfile(mp3):
         bucket = boto3.resource("s3").Bucket("cgws")

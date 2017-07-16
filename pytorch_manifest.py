@@ -77,7 +77,7 @@ for i in tqdm(range(num_files), ncols=100, desc='Checking files'):
     fid = os.path.splitext(filename)[0]
 
     wav_file = os.path.join(wav_dir,"{}.wav".format(fid))
-    duration = get_duration(dst_wav_file)
+    duration = get_duration(wav_file)
     if duration < args.min_seconds or duration > args.max_seconds:
         continue
 

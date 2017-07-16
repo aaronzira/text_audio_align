@@ -72,47 +72,38 @@ for i in tqdm(range(num_files), ncols=100, desc='Finding files'):
 total_hours = 0
 
 # get filenames wav directory
-for i in tqdm(range(num_files), ncols=100, desc='Copying files'):
+for i in tqdm(range(num_files), ncols=100, desc='Checking files'):
     filename = files[i]
     fid = os.path.splitext(filename)[0]
 
     wav_file = os.path.join(wav_dir,"{}.wav".format(fid))
-    dst_wav_file = os.path.join(dst_wav, "{}.wav".format(fid))
-
-    if not os.path.isfile(dst_wav_file):
-        duration = get_duration(wav_file)
-
-        if duration >= args.min_seconds and not args.dry_run:
-            shutil.copy2(wav_file, dst_wav_file)
-    else:
-        duration = get_duration(dst_wav_file)
-
+    duration = get_duration(dst_wav_file)
     if duration < args.min_seconds or duration > args.max_seconds:
         continue
 
     txt_file = os.path.join(txt_dir,"{}.txt".format(fid))
-    dst_txt_file = os.path.join(dst_txt, "{}.txt".format(fid))
-    if not os.path.isfile(dst_txt_file):
-        with open(txt_file) as raw_text:
-            transcript = raw_text.read().strip()
+    with open(txt_file) as raw_text:
+        transcript = raw_text.read().strip()
 
-        if len(transcript) == 0:
-            continue 
+    transcript = re.sub('\s+', ' ', transcript)
 
-        transcript = re.sub('\s+', ' ', transcript)
+    # at least two words in transcript
+    num_words = len(transcript.split())
+    if num_words <= 1:
+        continue 
 
-        # at least two words in transcript
-        num_words = len(transcript.split())
-        if num_words <= 1:
-            continue 
+    oov = re.search("[^a-zA-Z ']", transcript)
+    if oov is not None:
+        continue 
 
-        oov = re.search("[^a-zA-Z ']", transcript)
-        if oov is not None:
-            continue 
+    if not args.dry_run:
+        dst_txt_file = os.path.join(dst_txt, "{}.txt".format(fid))
+        with open(dst_txt_file, 'w') as f:
+            f.write(transcript.upper() + "\n")
 
-        if not args.dry_run:
-            with open(dst_txt_file, 'w') as f:
-                f.write(transcript.upper() + "\n")
+        dst_wav_file = os.path.join(dst_wav, "{}.wav".format(fid))
+        if not os.path.isfile(dst_wav_file):
+            shutil.copy2(wav_file, dst_wav_file)
 
     keep_files.append((duration, "{},{}".format(dst_wav_file,dst_txt_file)))
 

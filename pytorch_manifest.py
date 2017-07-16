@@ -14,8 +14,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--data-dir", dest="data_dir", type=str, default="/home/aaron/data/phoenix-data", help='Directory to read files from')
-parser.add_argument("--dst-dir", dest="dst_dir", default=".", type=str, help="Directory to store dataset to")
+parser.add_argument("--data-dir", dest="data_dir", type=str, default="/home/aaron/data/phoenix-files/gaps", help='Directory to read files from')
+parser.add_argument("--dst-dir", dest="dst_dir", default="/home/aaron/data/phoenix-files/pytorch", type=str, help="Directory to store dataset to")
 parser.add_argument("--min-seconds", dest="min_seconds", default=2.0, type=float, help="Cutoff for minimum duration")
 parser.add_argument("--max-seconds", dest="max_seconds", default=20.0, type=float, help="Cutoff for maximum duration")
 parser.add_argument("--max-hours", dest="max_hours", default=0, type=int, help="Size of the dataset in hours")
@@ -82,13 +82,10 @@ for i in tqdm(range(num_files), ncols=100, desc='Copying files'):
     if not os.path.isfile(dst_wav_file):
         duration = get_duration(wav_file)
 
-        if duration >= 2.0:
+        if duration >= args.min_seconds and not args.dry_run::
             shutil.copy2(wav_file, dst_wav_file)
     else:
         duration = get_duration(dst_wav_file)
-
-        if duration < 2.0:
-            os.remove(dst_wav_file)
 
     if duration < args.min_seconds or duration > args.max_seconds:
         continue
@@ -113,8 +110,9 @@ for i in tqdm(range(num_files), ncols=100, desc='Copying files'):
         if oov is not None:
             continue 
 
-        with open(dst_txt_file, 'w') as f:
-            f.write(transcript.upper() + "\n")
+        if not args.dry_run:
+            with open(dst_txt_file, 'w') as f:
+                f.write(transcript.upper() + "\n")
 
     keep_files.append((duration, "{},{}".format(dst_wav_file,dst_txt_file)))
 

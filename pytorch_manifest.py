@@ -96,12 +96,13 @@ for i in tqdm(range(num_files), ncols=100, desc='Checking files'):
     if oov is not None:
         continue 
 
+    dst_txt_file = os.path.join(dst_txt, "{}.txt".format(fid))
+    dst_wav_file = os.path.join(dst_wav, "{}.wav".format(fid))
+
     if not args.dry_run:
-        dst_txt_file = os.path.join(dst_txt, "{}.txt".format(fid))
         with open(dst_txt_file, 'w') as f:
             f.write(transcript.upper() + "\n")
 
-        dst_wav_file = os.path.join(dst_wav, "{}.wav".format(fid))
         if not os.path.isfile(dst_wav_file):
             shutil.copy2(wav_file, dst_wav_file)
 

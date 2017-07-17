@@ -41,6 +41,11 @@ if not os.path.exists(dst_txt):
     os.makedirs(dst_txt)
 
 def get_duration(wav_file):
+    m = re.search("[a-z0-9]+_([0-9]+)_([0-9]+).wav", wav_file)
+    if m:
+        duration = (int(m.group(2)) - int(m.group(1)))/100.
+        return duration
+
     try:
         f = sf.SoundFile(wav_file)
         if f.samplerate != 16000:
@@ -85,13 +90,6 @@ for i in tqdm(range(num_files), ncols=100, desc='Checking files'):
     with open(txt_file) as raw_text:
         transcript = raw_text.read().strip()
 
-    transcript = re.sub('\s+', ' ', transcript)
-
-    # at least two words in transcript
-    num_words = len(transcript.split())
-    if num_words <= 1:
-        continue 
-
     oov = re.search("[^a-zA-Z ']", transcript)
     if oov is not None:
         continue 
@@ -100,8 +98,9 @@ for i in tqdm(range(num_files), ncols=100, desc='Checking files'):
     dst_wav_file = os.path.join(dst_wav, "{}.wav".format(fid))
 
     if not args.dry_run:
+        transcript = re.sub('\s+', ' ', transcript).upper() + "\n"
         with open(dst_txt_file, 'w') as f:
-            f.write(transcript.upper() + "\n")
+            f.write(transcript)
 
         if not os.path.isfile(dst_wav_file):
             shutil.copy2(wav_file, dst_wav_file)

@@ -20,10 +20,10 @@ index=$2
 
 for fid in `tail -n +$index $filelist`
 do
-	num_files=`find /home/aaron/data/phoenix-files/gaps/txt/${fid}_*.txt 2>/dev/null | wc -l`
+	num_files=`find /home/aaron/data/phoenix-files/speaker-seg-test/txt/${fid}_*.txt 2>/dev/null | wc -l`
 	if [ $num_files -eq 0 ]
 	then
 		index=`grep -n $fid $filelist | cut -d ':' -f1`
-		python gaps.py $fid --file-index $index --audio-dir /home/aaron/data/mp3s/ --align-dir ~/data/ctm-alignments/ --dataset-dir /home/aaron/data/phoenix-files/gaps/
+		python gaps.py $fid --file-index $index --audio-dir /home/aaron/data/mp3s/ --align-dir ~/data/ctm-alignments/ --dataset-dir /home/aaron/data/phoenix-files/speaker-seg-test/ --speaker-turns
 	fi
 done

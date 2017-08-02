@@ -1,3 +1,6 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 import argparse
 import json
 import os
@@ -15,12 +18,12 @@ parser.add_argument('--file-index', type=str, default="1", dest="file_index", he
 parser.add_argument('--audio-dir', type=str, dest="audio_dir", default='.', help='Path to the directory containing audio files')
 parser.add_argument('--align-dir', type=str, dest="align_dir", default=".", help='Path to the directory containing alignments')
 parser.add_argument('--dataset-dir', type=str, dest="dataset_dir", default='.', help='Path to the dataset directory')
+parser.add_argument('--speaker-turns', action="store_true", dest="speaker_turns", default=False, help='Add speaker turn markers')
 args = parser.parse_args()
 
 logging.basicConfig(filename='gaps.log', level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger("info_logger")
 
-# temporarily running them from "others/"
 ctm_file = os.path.join(args.align_dir, args.file_id + "_align.json")
 mp3 = os.path.join(args.audio_dir, args.file_id + ".mp3")
 wav = os.path.join(args.audio_dir, args.file_id + ".wav")
@@ -75,10 +78,20 @@ with open(ctm_file) as f:
         clip = ctms[start_index:end_index]
 
         n_words = len(clip)
-        n_mismatches = sum([word['case'] == 'mismatch' for word in clip])
-        words = " ".join([word["word"] for word in clip]).encode('utf-8').strip()
+        count = 0
+        if args.speaker_turns:
+            words = " ".join([word["orig"] for word in clip]).encode('utf-8').strip()
+            words = re.sub("\-", " ", words)
+            words = re.sub(r"[^a-zA-Z0-9¶\' ]", "", words, re.UNICODE)
+            words = re.sub(r"¶", " ¶", words)
+            words = re.sub("\s{2,}", " ", words)
+            words = words.lower()
+            count = words.count('¶')
+        else:
+            words = " ".join([word["word"] for word in clip]).encode('utf-8').strip()
+            count = sum([word['case'] == 'mismatch' for word in clip])
 
-        if n_words >= 5 and n_mismatches >= 1:
+        if n_words >= 5 and count >= 1:
             start_sec = clip[0]['start']
             end_sec = clip[-1]['end']
 

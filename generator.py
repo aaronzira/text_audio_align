@@ -62,7 +62,7 @@ def data_generator(file_path,shuffle,vocabulary_size,train_size,test_size):
                     if "_" in sentence:
                         continue
 
-                    sentence = re_decimal.sub("\\1 point \\2", sentence) # decimals
+                    #sentence = re_decimal.sub("\\1 point \\2", sentence) # decimals
                     sentence = re_url.sub(" dot \\1", sentence) # URLs
                     sentence = re_negative.sub(" minus \\1", sentence) # negative numbers
                     sentence = re_pattern.sub(" ", sentence).lower() # space in case it was connected to a word
@@ -84,6 +84,7 @@ def data_generator(file_path,shuffle,vocabulary_size,train_size,test_size):
                     doc_sents.append(sentence)
 
         sentences.extend([sent.split() for sent in doc_sents])
+        print("{} sentences after {}.".format(len(sentences),txt_file))
 
     # word frequencies
     word_freq = nltk.FreqDist(itertools.chain(*sentences))

@@ -48,7 +48,10 @@ def sox_trim(start, end):
     """Write out a segment of an audio file to wav, based on start, end,
     """
     clip_file = os.path.join(args.dataset_dir, "wav/{}_{:07d}_{:07d}.wav".format(args.file_id, int(start*100), int(end*100))) 
-    subprocess.call(["sox", wav, clip_file, "trim", str(start), str(end - start)], stdout=FNULL, stderr=FNULL)
+    ret = subprocess.call(["sox", wav, clip_file, "trim", str(start), str(end - start)], stdout=FNULL, stderr=FNULL)
+    if ret != 0:
+        logger.error("sox failed: {}, error: {}".format(clip_file, ret))
+        sys.exit()
 
 with open(ctm_file) as f:
     ctms = json.loads(f.read())
@@ -84,14 +87,17 @@ with open(ctm_file) as f:
             words = re.sub("\-", " ", words)
             words = re.sub(r"[^a-zA-Z0-9¶\' ]", "", words, re.UNICODE)
             words = re.sub(r"¶", " ¶", words)
+            words = re.sub(r"^¶", "", words)
+            words = re.sub(r"¶$", "", words)
             words = re.sub("\s{2,}", " ", words)
             words = words.lower()
-            count = words.count('¶')
+            # count = words.count('¶')
         else:
             words = " ".join([word["word"] for word in clip]).encode('utf-8').strip()
             count = sum([word['case'] == 'mismatch' for word in clip])
 
-        if n_words >= 5 and count >= 1:
+        # if n_words >= 5 and count >= 1:
+        if n_words >= 5:
             start_sec = clip[0]['start']
             end_sec = clip[-1]['end']
 

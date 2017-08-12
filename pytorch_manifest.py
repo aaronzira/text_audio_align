@@ -1,3 +1,5 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
 import os
 import argparse
 import scipy.io.wavfile as wav
@@ -66,7 +68,7 @@ FNULL = open(os.devnull, 'w')
 out, err = subprocess.Popen("find " + wav_dir + " -type f -size +100c | wc -l", stdout=subprocess.PIPE, shell=True).communicate()
 num_files = int(out)
 
-find = subprocess.Popen(["find", wav_dir, "-size" + "+100c", "-type", "f"], stdout=subprocess.PIPE, stderr=FNULL)
+find = subprocess.Popen("find " + wav_dir + " -type f -size +100c", stdout=subprocess.PIPE, stderr=FNULL, shell=True)
 for i in tqdm(range(num_files), ncols=100, desc='Finding files'):
     line = find.stdout.readline()
     if len(line.strip()) > 0:
@@ -86,11 +88,12 @@ for i in tqdm(range(num_files), ncols=100, desc='Checking files'):
     if duration < args.min_seconds or duration > args.max_seconds:
         continue
 
+
     txt_file = os.path.join(txt_dir,"{}.txt".format(fid))
     with open(txt_file) as raw_text:
         transcript = raw_text.read().strip()
 
-    oov = re.search("[^a-zA-Z ']", transcript)
+    oov = re.search("[^a-zA-Z '¶]", transcript)
     if oov is not None:
         continue 
 

@@ -21,13 +21,19 @@ parser.add_argument('--dataset-dir', type=str, dest="dataset_dir", default='.', 
 parser.add_argument('--speaker-turns', action="store_true", dest="speaker_turns", default=False, help='Add speaker turn markers')
 args = parser.parse_args()
 
-logging.basicConfig(filename='gaps.log', level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+logging.basicConfig(filename='punctuations.log', level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger("info_logger")
 
 ctm_file = os.path.join(args.align_dir, args.file_id + "_align.json")
 mp3 = os.path.join(args.audio_dir, args.file_id + ".mp3")
 wav = os.path.join(args.audio_dir, args.file_id + ".wav")
 FNULL = open("/dev/null")
+
+if not os.path.isdir(os.path.join(args.dataset_dir, "txt")):
+    os.makedirs(os.path.join(args.dataset_dir, "txt"))
+
+if not os.path.isdir(os.path.join(args.dataset_dir, "wav")):
+    os.makedirs(os.path.join(args.dataset_dir, "wav"))
 
 if not os.path.isfile(ctm_file):
     sys.exit()
@@ -58,7 +64,6 @@ with open(ctm_file) as f:
 
     null_word = {'start': 0, 'end':0}
     gaps = [second['start']-first['end'] for first, second in zip([null_word]+ctms, ctms)]
-
     # we split from one good gap to the next
     # a good gap is when the silence between the words is long
     # and the word *itself* is long and is not a mismatch
@@ -85,9 +90,11 @@ with open(ctm_file) as f:
         if args.speaker_turns:
             words = " ".join([word["orig"] for word in clip]).encode('utf-8').strip()
             words = re.sub("\-", " ", words)
-            words = re.sub(r"[^a-zA-Z0-9¶\' ]", "", words, re.UNICODE)
+            # trying with some punctuation retained
+            words = re.sub(r"[\?!]",".",words)
+            words = re.sub(r"[^a-zA-Z0-9¶\.\,\' ]", "", words, re.UNICODE)
+            words = re.sub(r"^¶|¶$", "", words)
             words = re.sub(r"¶", " ¶", words)
-            words = re.sub(r"^¶", "", words)
             words = re.sub(r"¶$", "", words)
             words = re.sub("\s{2,}", " ", words)
             words = words.lower()

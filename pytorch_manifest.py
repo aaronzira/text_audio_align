@@ -101,6 +101,8 @@ for i in tqdm(range(num_files), ncols=100, desc='Checking files'):
     dst_wav_file = os.path.join(dst_wav, "{}.wav".format(fid))
 
     if not args.dry_run:
+        # replacing pilcrows with pipes
+        transcript = re.sub('¶','|',transcript)
         transcript = re.sub('\s+', ' ', transcript).upper() + "\n"
         with open(dst_txt_file, 'w') as f:
             f.write(transcript)
